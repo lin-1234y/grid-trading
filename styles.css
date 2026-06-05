@@ -1,19 +1,23 @@
 :root {
   color-scheme: light;
-  --page: #eef3f5;
+  --page: #edf4f7;
   --surface: #ffffff;
-  --soft: #f7fafb;
-  --ink: #1f2933;
-  --muted: #64717d;
-  --line: #d9e2e7;
-  --accent: #0f766e;
-  --accent-dark: #115e59;
+  --soft: #f6f9fb;
+  --ink: #172331;
+  --muted: #637282;
+  --line: #d6e1e7;
+  --accent: #0d9488;
+  --accent-dark: #0f5f59;
   --blue: #2563eb;
-  --warn: #b45309;
-  --danger: #b42318;
-  --danger-soft: #fde8e5;
-  --shadow: 0 16px 44px rgba(31, 41, 51, 0.10);
-  font-family: "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+  --sky: #0ea5e9;
+  --warn: #b7791f;
+  --gold: #f59e0b;
+  --danger: #c24136;
+  --danger-soft: #fff0ed;
+  --success-soft: #e9fbf5;
+  --shadow: 0 14px 34px rgba(18, 38, 63, 0.10);
+  --shadow-soft: 0 8px 20px rgba(18, 38, 63, 0.07);
+  font-family: "Inter", "Segoe UI", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", Arial, sans-serif;
 }
 
 * {
@@ -24,7 +28,10 @@ body {
   margin: 0;
   min-height: 100vh;
   color: var(--ink);
-  background: var(--page);
+  background:
+    linear-gradient(180deg, #dcecf0 0, #edf4f7 260px, #f8fbfc 100%);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
 }
 
 button,
@@ -35,16 +42,25 @@ select {
 
 button {
   min-height: 44px;
-  padding: 0 14px;
+  padding: 0 16px;
   border: 0;
   border-radius: 7px;
   background: var(--accent-dark);
   color: #fff;
   cursor: pointer;
+  font-weight: 700;
+  letter-spacing: 0;
+  box-shadow: var(--shadow-soft);
+  transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease;
 }
 
 button:hover {
   filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+button:active {
+  transform: translateY(0);
 }
 
 input,
@@ -53,10 +69,19 @@ select {
   min-height: 44px;
   border: 1px solid var(--line);
   border-radius: 7px;
-  background: #fff;
+  background: linear-gradient(180deg, #fff, #fbfdfe);
   color: var(--ink);
   font-size: 16px;
-  padding: 0 10px;
+  padding: 0 11px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input:focus,
+select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.14);
 }
 
 .single-app {
@@ -71,10 +96,13 @@ select {
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  padding: 18px;
-  border: 1px solid var(--line);
+  padding: 20px;
+  border: 1px solid rgba(15, 95, 89, 0.18);
   border-radius: 8px;
-  background: var(--surface);
+  background:
+    linear-gradient(135deg, rgba(15, 95, 89, 0.98), rgba(31, 83, 124, 0.94) 58%, rgba(181, 113, 25, 0.90));
+  color: #fff;
+  box-shadow: var(--shadow);
 }
 
 .window-tabs {
@@ -84,18 +112,22 @@ select {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 2px 0 6px;
-  background: var(--page);
+  padding: 4px 0 8px;
+  background: rgba(237, 244, 247, 0.92);
+  backdrop-filter: blur(10px);
 }
 
 .tab {
   flex: 0 0 auto;
-  background: #e8eef1;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.86);
   color: var(--ink);
+  box-shadow: none;
 }
 
 .tab.active {
-  background: var(--accent-dark);
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--accent-dark), #1d6f92);
   color: #fff;
 }
 
@@ -115,7 +147,7 @@ select {
 
 .eyebrow {
   margin: 0 0 6px;
-  color: var(--accent);
+  color: #c7f7ee;
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0;
@@ -130,21 +162,28 @@ p {
 }
 
 h1 {
-  font-size: 27px;
+  font-size: 30px;
   line-height: 1.15;
+  font-weight: 850;
 }
 
 h2 {
-  font-size: 16px;
+  font-size: 17px;
+  font-weight: 800;
 }
 
 h3 {
   font-size: 16px;
+  font-weight: 800;
 }
 
 p {
   color: var(--muted);
   line-height: 1.55;
+}
+
+.app-header p {
+  color: rgba(255, 255, 255, 0.78);
 }
 
 .brand p:last-child {
@@ -178,6 +217,7 @@ p {
   min-height: 54px;
   padding: 14px 16px;
   border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, #ffffff, #f8fbfc);
 }
 
 .panel-title span,
@@ -197,14 +237,31 @@ p {
   gap: 10px;
 }
 
+.panel > .form-grid,
+.panel > .field-grid,
+.panel > .actions,
+.panel > button {
+  margin: 14px;
+}
+
+.panel > .form-grid + .actions,
+.panel > .field-grid + .actions {
+  margin-top: 0;
+}
+
+.panel > button {
+  width: calc(100% - 28px);
+}
+
 .field {
   display: grid;
   gap: 6px;
 }
 
 .field span {
-  color: var(--muted);
-  font-size: 13px;
+  color: #516273;
+  font-size: 12px;
+  font-weight: 750;
 }
 
 .notice {
@@ -269,7 +326,15 @@ p {
 #loadSymbolButton,
 #addGridButton,
 #addTradeButton {
-  background: var(--blue);
+  background: linear-gradient(135deg, var(--blue), #0f766e);
+}
+
+#runScenarioButton {
+  background: linear-gradient(135deg, var(--gold), #0d9488);
+}
+
+#clearTradesButton {
+  background: linear-gradient(135deg, #c24136, #9a3412);
 }
 
 .metrics {
@@ -279,23 +344,45 @@ p {
 }
 
 .metric {
-  padding: 15px;
+  position: relative;
+  padding: 16px 16px 15px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: var(--surface);
+  background:
+    linear-gradient(180deg, #ffffff, #f8fbfc);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+}
+
+.metric::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: linear-gradient(180deg, var(--accent), var(--sky));
+}
+
+.metric:nth-child(4)::before {
+  background: linear-gradient(180deg, var(--gold), var(--accent));
+}
+
+.metric.danger::before {
+  background: linear-gradient(180deg, var(--danger), var(--gold));
 }
 
 .metric span {
   display: block;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 750;
 }
 
 .metric strong {
   display: block;
   margin-top: 8px;
-  font-size: 23px;
+  font-size: 24px;
   line-height: 1.12;
+  font-variant-numeric: tabular-nums;
 }
 
 .metric.danger strong {
@@ -315,11 +402,13 @@ p {
 
 .grid-card {
   display: grid;
-  gap: 12px;
-  padding: 12px;
+  gap: 14px;
+  padding: 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: var(--soft);
+  background:
+    linear-gradient(180deg, #ffffff, #f5faf9);
+  box-shadow: var(--shadow-soft);
 }
 
 .grid-card-head {
@@ -332,13 +421,15 @@ p {
 .delete-grid {
   min-height: 32px;
   padding: 0 10px;
-  background: #e8eef1;
-  color: var(--ink);
+  border: 1px solid #d9e2e7;
+  background: #f1f5f7;
+  color: #324250;
+  box-shadow: none;
 }
 
 .result-box {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   padding: 14px;
 }
 
@@ -347,7 +438,7 @@ p {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 9px 0;
+  padding: 10px 0;
   border-bottom: 1px solid var(--line);
 }
 
@@ -362,6 +453,7 @@ p {
 
 .result-box strong {
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .t-tool {
@@ -408,9 +500,11 @@ p {
   place-items: center;
   padding: 0 14px;
   border-radius: 7px;
-  background: var(--blue);
+  background: linear-gradient(135deg, var(--blue), #1d6f92);
   color: #fff;
   cursor: pointer;
+  font-weight: 700;
+  box-shadow: var(--shadow-soft);
 }
 
 .file-button input {
@@ -421,6 +515,7 @@ p {
   width: 100%;
   overflow: auto;
   -webkit-overflow-scrolling: touch;
+  background: #fff;
 }
 
 .table-wrap.tall {
@@ -429,30 +524,36 @@ p {
 
 table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 14px;
 }
 
 th,
 td {
-  padding: 10px 12px;
+  padding: 11px 12px;
   border-bottom: 1px solid var(--line);
   text-align: left;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 th {
   position: sticky;
   top: 0;
   z-index: 1;
-  color: var(--muted);
+  color: #536577;
   font-size: 12px;
   font-weight: 700;
-  background: var(--soft);
+  background: #eef5f7;
+}
+
+tbody tr:nth-child(even) {
+  background: #fbfdfe;
 }
 
 tbody tr:hover {
-  background: #f2f8f7;
+  background: #ecf8f5;
 }
 
 .warning-row {
@@ -472,7 +573,7 @@ tbody tr:hover {
 
 @media (max-width: 760px) {
   body {
-    background: var(--surface);
+    background: #f7fbfc;
   }
 
   .single-app {
@@ -484,7 +585,7 @@ tbody tr:hover {
     align-items: flex-start;
     flex-direction: column;
     gap: 8px;
-    padding: 12px;
+    padding: 14px;
   }
 
   .app-header p {
@@ -495,11 +596,13 @@ tbody tr:hover {
     flex-wrap: nowrap;
     margin: 0 -10px;
     overflow-x: auto;
-    padding: 4px 10px 8px;
+    padding: 6px 10px 9px;
   }
 
   .tab {
     min-width: max-content;
+    min-height: 40px;
+    padding: 0 13px;
   }
 
   .sidebar,
@@ -532,7 +635,7 @@ tbody tr:hover {
   }
 
   .metric strong {
-    font-size: 20px;
+    font-size: 21px;
   }
 
   .panel > .panel-title {
@@ -547,15 +650,28 @@ tbody tr:hover {
   .grid-card {
     padding: 12px;
   }
+
+  button {
+    width: 100%;
+  }
+
+  .grid-card-head button,
+  .tab {
+    width: auto;
+  }
 }
 
 @media (max-width: 430px) {
   h1 {
-    font-size: 23px;
+    font-size: 24px;
   }
 
   th,
   td {
-    padding: 9px;
+    padding: 10px;
+  }
+
+  .metric {
+    padding: 14px;
   }
 }
