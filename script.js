@@ -34,12 +34,18 @@ const els = {
   addTrade: document.querySelector("#addTradeButton"),
   clearTrades: document.querySelector("#clearTradesButton"),
   tradeFlowRows: document.querySelector("#tradeFlowRows"),
-  flowSymbolChoices: document.querySelector("#flowSymbolChoices"),
+  currentFlowSymbol: document.querySelector("#currentFlowSymbol"),
+  openFlowSymbolPicker: document.querySelector("#openFlowSymbolPicker"),
   tFilterSymbol: document.querySelector("#tFilterSymbolInput"),
   tStartDate: document.querySelector("#tStartDateInput"),
   tEndDate: document.querySelector("#tEndDateInput"),
   applyTradeFilter: document.querySelector("#applyTradeFilterButton"),
-  symbolChoices: document.querySelector("#symbolChoices"),
+  currentQuerySymbol: document.querySelector("#currentQuerySymbol"),
+  openQuerySymbolPicker: document.querySelector("#openQuerySymbolPicker"),
+  symbolModal: document.querySelector("#symbolModal"),
+  symbolModalTitle: document.querySelector("#symbolModalTitle"),
+  symbolModalChoices: document.querySelector("#symbolModalChoices"),
+  closeSymbolModal: document.querySelector("#closeSymbolModal"),
   matchedRows: document.querySelector("#matchedRows"),
   unmatchedRows: document.querySelector("#unmatchedRows"),
   matchedSummary: document.querySelector("#matchedSummary"),
@@ -65,6 +71,7 @@ let scenarioRows = [];
 let trades = [];
 let saveTimer = 0;
 let flowFilterSymbol = "";
+let symbolPickerMode = "query";
 const STORAGE_KEY = "gridTradingToolState";
 
 function n(value, fallback = 0) {
@@ -519,11 +526,23 @@ function symbolButtons(active) {
 
 function renderSymbolChoices() {
   const active = els.tFilterSymbol.value.trim().toUpperCase();
-  els.symbolChoices.innerHTML = symbolButtons(active);
+  els.currentQuerySymbol.textContent = active ? `当前：${active}` : "当前：全部股票";
 }
 
 function renderFlowSymbolChoices() {
-  els.flowSymbolChoices.innerHTML = symbolButtons(flowFilterSymbol);
+  els.currentFlowSymbol.textContent = flowFilterSymbol ? `当前：${flowFilterSymbol}` : "当前：全部股票";
+}
+
+function openSymbolModal(mode) {
+  symbolPickerMode = mode;
+  const active = mode === "flow" ? flowFilterSymbol : els.tFilterSymbol.value.trim().toUpperCase();
+  els.symbolModalTitle.textContent = mode === "flow" ? "选择交易流水股票" : "选择查询股票";
+  els.symbolModalChoices.innerHTML = symbolButtons(active);
+  els.symbolModal.hidden = false;
+}
+
+function closeSymbolModal() {
+  els.symbolModal.hidden = true;
 }
 
 function matchTrades(rows) {
@@ -667,21 +686,24 @@ els.tradeFlowRows.addEventListener("click", (event) => {
     renderQuery();
   }
 });
-els.flowSymbolChoices.addEventListener("click", (event) => {
+els.openFlowSymbolPicker.addEventListener("click", () => openSymbolModal("flow"));
+els.openQuerySymbolPicker.addEventListener("click", () => openSymbolModal("query"));
+els.closeSymbolModal.addEventListener("click", closeSymbolModal);
+els.symbolModal.addEventListener("click", (event) => {
+  if (event.target.matches("[data-close-symbol-modal]")) closeSymbolModal();
   const button = event.target.closest(".symbol-chip");
   if (!button) return;
-  flowFilterSymbol = button.dataset.symbol || "";
-  renderAllTrades();
+  if (symbolPickerMode === "flow") {
+    flowFilterSymbol = button.dataset.symbol || "";
+    renderAllTrades();
+  } else {
+    els.tFilterSymbol.value = button.dataset.symbol || "";
+    renderQuery();
+  }
+  closeSymbolModal();
   saveState();
 });
 els.applyTradeFilter.addEventListener("click", () => {
-  renderQuery();
-  saveState();
-});
-els.symbolChoices.addEventListener("click", (event) => {
-  const button = event.target.closest(".symbol-chip");
-  if (!button) return;
-  els.tFilterSymbol.value = button.dataset.symbol || "";
   renderQuery();
   saveState();
 });

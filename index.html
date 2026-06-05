@@ -106,7 +106,10 @@
           <div class="panel-title"><h2>交易流水</h2><span>可编辑、修改、删除</span></div>
           <div class="symbol-filter flow-filter">
             <div class="quick-title">按个股筛选流水</div>
-            <div id="flowSymbolChoices" class="symbol-chips"></div>
+            <div class="picker-row">
+              <span id="currentFlowSymbol" class="current-symbol">全部股票</span>
+              <button id="openFlowSymbolPicker" type="button">选择股票</button>
+            </div>
           </div>
           <div class="table-wrap tall">
             <table>
@@ -144,14 +147,17 @@
         <section class="panel">
           <div class="panel-title"><h2>查询个股细节</h2><span>按代码和日期阶段查询</span></div>
           <div class="form-grid">
-            <label class="field"><span>代码</span><input id="tFilterSymbolInput" placeholder="留空看全部"></label>
+            <input id="tFilterSymbolInput" type="hidden">
             <label class="field"><span>开始日期</span><input id="tStartDateInput" type="date"></label>
             <label class="field"><span>结束日期</span><input id="tEndDateInput" type="date"></label>
           </div>
           <button id="applyTradeFilterButton" type="button">查询个股细节</button>
           <div class="symbol-filter">
-            <div class="quick-title">有交易的股票</div>
-            <div id="symbolChoices" class="symbol-chips"></div>
+            <div class="quick-title">查询股票</div>
+            <div class="picker-row">
+              <span id="currentQuerySymbol" class="current-symbol">全部股票</span>
+              <button id="openQuerySymbolPicker" type="button">选择股票</button>
+            </div>
           </div>
         </section>
 
@@ -186,6 +192,17 @@
         </section>
       </section>
     </main>
+
+    <div id="symbolModal" class="modal" hidden>
+      <div class="modal-backdrop" data-close-symbol-modal></div>
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="symbolModalTitle">
+        <div class="modal-title">
+          <h2 id="symbolModalTitle">选择股票</h2>
+          <button id="closeSymbolModal" class="icon-button" type="button">×</button>
+        </div>
+        <div id="symbolModalChoices" class="symbol-grid"></div>
+      </section>
+    </div>
 
     <template id="gridTemplate">
       <article class="grid-card">
