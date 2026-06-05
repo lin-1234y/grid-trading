@@ -120,11 +120,41 @@ select:focus {
 .tab {
   width: 100%;
   min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.86);
   color: var(--ink);
   box-shadow: none;
   white-space: nowrap;
+}
+
+.tab::before {
+  color: currentColor;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.tab:nth-child(1)::before {
+  content: "▦";
+}
+
+.tab:nth-child(2)::before {
+  content: "+";
+}
+
+.tab:nth-child(3)::before {
+  content: "≡";
+}
+
+.tab:nth-child(4)::before {
+  content: "⚙";
+}
+
+.tab:nth-child(5)::before {
+  content: "⌕";
 }
 
 .tab.active {
@@ -513,6 +543,55 @@ p {
   display: none;
 }
 
+.symbol-filter {
+  display: grid;
+  gap: 8px;
+  margin: 0 14px 14px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f7fbfc;
+}
+
+.quick-title {
+  color: #516273;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.symbol-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.symbol-chip {
+  width: auto;
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid #cfe0e7;
+  background: #fff;
+  color: #243747;
+  box-shadow: none;
+}
+
+.symbol-chip.active {
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--accent-dark), var(--blue));
+  color: #fff;
+}
+
+.symbol-chip span {
+  margin-left: 5px;
+  color: inherit;
+  opacity: 0.72;
+}
+
+.empty-chip {
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .table-wrap {
   width: 100%;
   overflow: auto;
@@ -659,6 +738,88 @@ tbody tr:hover {
 
   .metric strong {
     font-size: 21px;
+  }
+
+  .table-wrap,
+  .table-wrap.tall {
+    max-height: none;
+    overflow: visible;
+    background: transparent;
+  }
+
+  table,
+  tbody {
+    display: block;
+    width: 100%;
+  }
+
+  thead {
+    display: none;
+  }
+
+  tbody tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin: 10px 0;
+    padding: 11px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: var(--shadow-soft);
+  }
+
+  tbody tr:nth-child(even) {
+    background: #fff;
+  }
+
+  tbody tr:hover {
+    background: #fff;
+  }
+
+  td {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  td[data-label]::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  td[data-label="成交金额"],
+  td[data-label="操作"],
+  td[data-label="说明"] {
+    grid-column: 1 / -1;
+  }
+
+  td[data-label="操作"] {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  td[data-label="操作"]::before {
+    width: 100%;
+  }
+
+  td[data-label="操作"] button {
+    width: auto;
+    min-height: 36px;
+    flex: 1 1 86px;
+  }
+
+  td.empty {
+    display: block;
+    grid-column: 1 / -1;
+    padding: 16px;
   }
 
   .panel > .panel-title {
