@@ -34,6 +34,7 @@ const els = {
   addTrade: document.querySelector("#addTradeButton"),
   clearTrades: document.querySelector("#clearTradesButton"),
   tradeFlowRows: document.querySelector("#tradeFlowRows"),
+  flowSymbolChoices: document.querySelector("#flowSymbolChoices"),
   tFilterSymbol: document.querySelector("#tFilterSymbolInput"),
   tStartDate: document.querySelector("#tStartDateInput"),
   tEndDate: document.querySelector("#tEndDateInput"),
@@ -44,6 +45,7 @@ const els = {
   matchedSummary: document.querySelector("#matchedSummary"),
   unmatchedSummary: document.querySelector("#unmatchedSummary"),
   tMatchedProfit: document.querySelector("#tMatchedProfit"),
+  tTotalFees: document.querySelector("#tTotalFees"),
   tMatchedShares: document.querySelector("#tMatchedShares"),
   tOpenBuyShares: document.querySelector("#tOpenBuyShares"),
   tOpenSellShares: document.querySelector("#tOpenSellShares"),
@@ -62,6 +64,7 @@ let grids = [];
 let scenarioRows = [];
 let trades = [];
 let saveTimer = 0;
+let flowFilterSymbol = "";
 const STORAGE_KEY = "gridTradingToolState";
 
 function n(value, fallback = 0) {
@@ -100,8 +103,14 @@ function esc(value) {
   }[char]));
 }
 
-function cell(label, value) {
-  return `<td data-label="${esc(label)}">${value}</td>`;
+function cell(label, value, className = "") {
+  return `<td data-label="${esc(label)}"${className ? ` class="${className}"` : ""}>${value}</td>`;
+}
+
+function profitClass(value) {
+  if (value > 0) return "profit-positive";
+  if (value < 0) return "profit-negative";
+  return "profit-flat";
 }
 
 function switchWindow(id, persist = true) {
@@ -185,6 +194,9 @@ function collectState() {
       startDate: els.tStartDate.value,
       endDate: els.tEndDate.value,
     },
+    flow: {
+      symbol: flowFilterSymbol,
+    },
     trades,
   };
 }
@@ -234,6 +246,8 @@ function restoreState() {
   if (query.symbol !== undefined) els.tFilterSymbol.value = query.symbol;
   if (query.startDate !== undefined) els.tStartDate.value = query.startDate;
   if (query.endDate !== undefined) els.tEndDate.value = query.endDate;
+  const flow = state.flow || {};
+  if (flow.symbol !== undefined) flowFilterSymbol = flow.symbol;
   if (Array.isArray(state.trades)) trades = state.trades;
   if (state.activeWindow) switchWindow(state.activeWindow, false);
 }
@@ -453,13 +467,15 @@ function addTrade() {
 }
 
 function renderAllTrades(editId = "") {
-  const sorted = [...trades].sort((a, b) => `${a.date}-${a.createdAt}`.localeCompare(`${b.date}-${b.createdAt}`));
+  renderFlowSymbolChoices();
+  const visible = flowFilterSymbol ? trades.filter((t) => t.symbol === flowFilterSymbol) : trades;
+  const sorted = [...visible].sort((a, b) => `${a.date}-${a.createdAt}`.localeCompare(`${b.date}-${b.createdAt}`));
   els.tradeFlowRows.innerHTML = sorted.length ? sorted.map((t, i) => {
     if (t.id === editId) {
       return `<tr data-id="${t.id}" class="edit-row">${cell("序号", i + 1)}${cell("日期", `<input data-edit="date" type="date" value="${esc(t.date)}">`)}${cell("代码", `<input data-edit="symbol" value="${esc(t.symbol)}">`)}${cell("方向", `<select data-edit="side"><option value="buy"${t.side === "buy" ? " selected" : ""}>买入</option><option value="sell"${t.side === "sell" ? " selected" : ""}>卖出</option></select>`)}${cell("价格", `<input data-edit="price" type="number" step="0.001" value="${t.price}">`)}${cell("股数", `<input data-edit="shares" type="number" step="100" value="${t.shares}">`)}${cell("成交金额", money(t.amount))}${cell("费用", `<input data-edit="fee" type="number" step="0.01" value="${t.fee}">`)}${cell("操作", `<button data-action="save">保存</button><button data-action="cancel">取消</button>`)}</tr>`;
     }
     return `<tr data-id="${t.id}">${cell("序号", i + 1)}${cell("日期", esc(t.date))}${cell("代码", esc(t.symbol))}${cell("方向", t.side === "buy" ? "买入" : "卖出")}${cell("价格", money(t.price))}${cell("股数", qty(t.shares))}${cell("成交金额", money(t.amount))}${cell("费用", money(t.fee))}${cell("操作", `<button data-action="edit">编辑</button><button data-action="delete">删除</button>`)}</tr>`;
-  }).join("") : `<tr><td colspan="9" class="empty">还没有交易流水。</td></tr>`;
+  }).join("") : `<tr><td colspan="9" class="empty">${flowFilterSymbol ? `没有 ${esc(flowFilterSymbol)} 的交易流水。` : "还没有交易流水。"}</td></tr>`;
 }
 
 function editTradeFromRow(row) {
@@ -494,12 +510,20 @@ function tradeSymbols() {
   return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 }
 
-function renderSymbolChoices() {
-  const active = els.tFilterSymbol.value.trim().toUpperCase();
+function symbolButtons(active) {
   const symbols = tradeSymbols();
-  els.symbolChoices.innerHTML = symbols.length
+  return symbols.length
     ? `<button class="symbol-chip${active ? "" : " active"}" data-symbol="" type="button">全部</button>${symbols.map(([symbol, count]) => `<button class="symbol-chip${active === symbol ? " active" : ""}" data-symbol="${esc(symbol)}" type="button">${esc(symbol)} <span>${count}</span></button>`).join("")}`
     : `<span class="empty-chip">还没有交易股票</span>`;
+}
+
+function renderSymbolChoices() {
+  const active = els.tFilterSymbol.value.trim().toUpperCase();
+  els.symbolChoices.innerHTML = symbolButtons(active);
+}
+
+function renderFlowSymbolChoices() {
+  els.flowSymbolChoices.innerHTML = symbolButtons(flowFilterSymbol);
 }
 
 function matchTrades(rows) {
@@ -545,18 +569,22 @@ function findOpposite(open, side) {
 
 function renderQuery() {
   renderSymbolChoices();
-  const { matched, unmatched } = matchTrades(filteredTrades());
+  const rows = filteredTrades();
+  const { matched, unmatched } = matchTrades(rows);
   const profit = matched.reduce((sum, r) => sum + r.profit, 0);
+  const totalFees = rows.reduce((sum, r) => sum + Number(r.fee || 0), 0);
   const matchedShares = matched.reduce((sum, r) => sum + r.shares, 0);
   const openBuy = unmatched.filter((r) => r.side === "buy").reduce((sum, r) => sum + r.remaining, 0);
   const openSell = unmatched.filter((r) => r.side === "sell").reduce((sum, r) => sum + r.remaining, 0);
   els.tMatchedProfit.textContent = money(profit);
+  els.tMatchedProfit.className = profitClass(profit);
+  els.tTotalFees.textContent = money(totalFees);
   els.tMatchedShares.textContent = `${qty(matchedShares)} 股`;
   els.tOpenBuyShares.textContent = `${qty(openBuy)} 股`;
   els.tOpenSellShares.textContent = `${qty(openSell)} 股`;
   els.matchedSummary.textContent = `${matched.length} 组匹配`;
   els.unmatchedSummary.textContent = `${unmatched.length} 条未匹配`;
-  els.matchedRows.innerHTML = matched.length ? matched.map((r, i) => `<tr>${cell("序号", i + 1)}${cell("代码", esc(r.symbol))}${cell("卖出日期", esc(r.sellDate))}${cell("卖价", money(r.sellPrice))}${cell("买入日期", esc(r.buyDate))}${cell("买价", money(r.buyPrice))}${cell("股数", qty(r.shares))}${cell("成交金额", money(r.amount))}${cell("费用", money(r.fee))}${cell("盈亏", money(r.profit))}</tr>`).join("") : `<tr><td colspan="10" class="empty">还没有可匹配的反向交易。</td></tr>`;
+  els.matchedRows.innerHTML = matched.length ? matched.map((r, i) => `<tr>${cell("序号", i + 1)}${cell("代码", esc(r.symbol))}${cell("卖出日期", esc(r.sellDate))}${cell("卖价", money(r.sellPrice))}${cell("买入日期", esc(r.buyDate))}${cell("买价", money(r.buyPrice))}${cell("股数", qty(r.shares))}${cell("成交金额", money(r.amount))}${cell("费用", money(r.fee))}${cell("盈亏", money(r.profit), profitClass(r.profit))}</tr>`).join("") : `<tr><td colspan="10" class="empty">还没有可匹配的反向交易。</td></tr>`;
   els.unmatchedRows.innerHTML = unmatched.length ? unmatched.map((r, i) => `<tr>${cell("序号", i + 1)}${cell("日期", esc(r.date))}${cell("代码", esc(r.symbol))}${cell("方向", r.side === "buy" ? "买入" : "卖出")}${cell("价格", money(r.price))}${cell("剩余股数", qty(r.remaining))}${cell("成交金额", money(r.remaining * r.price))}${cell("剩余费用", money(r.remainingFee))}</tr>`).join("") : `<tr><td colspan="8" class="empty">没有未匹配交易。</td></tr>`;
 }
 
@@ -638,6 +666,13 @@ els.tradeFlowRows.addEventListener("click", (event) => {
     renderAllTrades();
     renderQuery();
   }
+});
+els.flowSymbolChoices.addEventListener("click", (event) => {
+  const button = event.target.closest(".symbol-chip");
+  if (!button) return;
+  flowFilterSymbol = button.dataset.symbol || "";
+  renderAllTrades();
+  saveState();
 });
 els.applyTradeFilter.addEventListener("click", () => {
   renderQuery();

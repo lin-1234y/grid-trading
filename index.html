@@ -104,6 +104,10 @@
       <section id="flowWindow" class="tool-window">
         <section class="panel">
           <div class="panel-title"><h2>交易流水</h2><span>可编辑、修改、删除</span></div>
+          <div class="symbol-filter flow-filter">
+            <div class="quick-title">按个股筛选流水</div>
+            <div id="flowSymbolChoices" class="symbol-chips"></div>
+          </div>
           <div class="table-wrap tall">
             <table>
               <thead><tr><th>序号</th><th>日期</th><th>代码</th><th>方向</th><th>价格</th><th>股数</th><th>成交金额</th><th>费用</th><th>操作</th></tr></thead>
@@ -153,6 +157,7 @@
 
         <section class="metrics">
           <article class="metric"><span>匹配收益</span><strong id="tMatchedProfit">-</strong></article>
+          <article class="metric"><span>全部交易手续费</span><strong id="tTotalFees">-</strong></article>
           <article class="metric"><span>已匹配股数</span><strong id="tMatchedShares">-</strong></article>
           <article class="metric"><span>未匹配买入</span><strong id="tOpenBuyShares">-</strong></article>
           <article class="metric"><span>未匹配卖出</span><strong id="tOpenSellShares">-</strong></article>

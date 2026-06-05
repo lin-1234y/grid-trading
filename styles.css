@@ -371,7 +371,7 @@ p {
 
 .metrics {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
 }
 
@@ -419,6 +419,21 @@ p {
 
 .metric.danger strong {
   color: var(--danger);
+}
+
+.profit-positive {
+  color: #047857;
+  font-weight: 850;
+}
+
+.profit-negative {
+  color: var(--danger);
+  font-weight: 850;
+}
+
+.profit-flat {
+  color: var(--ink);
+  font-weight: 800;
 }
 
 .scenario-grid {
@@ -551,6 +566,10 @@ p {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #f7fbfc;
+}
+
+.flow-filter {
+  margin-top: 14px;
 }
 
 .quick-title {
