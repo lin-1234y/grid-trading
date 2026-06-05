@@ -759,10 +759,10 @@ tbody tr:hover {
 
   tbody tr {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-    margin: 10px 0;
-    padding: 11px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    margin: 8px 0;
+    padding: 9px;
     border: 1px solid var(--line);
     border-radius: 8px;
     background: #fff;
@@ -779,7 +779,7 @@ tbody tr:hover {
 
   td {
     display: grid;
-    gap: 3px;
+    gap: 2px;
     min-width: 0;
     padding: 0;
     border: 0;
@@ -790,30 +790,27 @@ tbody tr:hover {
   td[data-label]::before {
     content: attr(data-label);
     color: var(--muted);
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 800;
   }
 
-  td[data-label="成交金额"],
-  td[data-label="操作"],
-  td[data-label="说明"] {
-    grid-column: 1 / -1;
+  td[data-label] {
+    font-size: 12px;
+    line-height: 1.25;
   }
 
   td[data-label="操作"] {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  td[data-label="操作"]::before {
-    width: 100%;
+    gap: 4px;
   }
 
   td[data-label="操作"] button {
     width: auto;
-    min-height: 36px;
-    flex: 1 1 86px;
+    min-height: 30px;
+    flex: 1 1 42px;
+    padding: 0 6px;
+    font-size: 12px;
   }
 
   td.empty {
@@ -861,4 +858,5 @@ tbody tr:hover {
   .metrics {
     grid-template-columns: 1fr;
   }
+
 }
