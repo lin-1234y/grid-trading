@@ -1124,6 +1124,92 @@ tbody tr:hover {
     font-size: 11px;
   }
 
+  #tradeFlowRows tr,
+  #matchedRows tr,
+  #unmatchedRows tr {
+    grid-template-columns: 1.12fr 0.72fr 0.86fr 0.86fr 0.95fr;
+    grid-auto-rows: minmax(27px, auto);
+    align-items: stretch;
+  }
+
+  #tradeFlowRows .seq-cell,
+  #matchedRows .seq-cell,
+  #unmatchedRows .seq-cell {
+    display: none;
+  }
+
+  #tradeFlowRows td,
+  #matchedRows td,
+  #unmatchedRows td {
+    justify-content: center;
+  }
+
+  #tradeFlowRows .date-cell,
+  #matchedRows .sell-date-cell,
+  #unmatchedRows .date-cell {
+    color: #ffd166;
+    font-family: var(--font-number);
+    font-weight: 850;
+  }
+
+  #tradeFlowRows .date-cell::before,
+  #tradeFlowRows .symbol-cell::before,
+  #matchedRows .sell-date-cell::before,
+  #matchedRows .symbol-cell::before,
+  #unmatchedRows .date-cell::before,
+  #unmatchedRows .symbol-cell::before {
+    content: "";
+    display: none;
+  }
+
+  #tradeFlowRows .date-cell { grid-area: date; }
+  #tradeFlowRows .symbol-cell { grid-area: symbol; }
+  #tradeFlowRows .side-cell { grid-area: side; }
+  #tradeFlowRows .price-cell { grid-area: price; }
+  #tradeFlowRows .shares-cell { grid-area: shares; }
+  #tradeFlowRows .amount-cell { grid-area: amount; }
+  #tradeFlowRows .fee-cell { grid-area: fee; }
+  #tradeFlowRows .action-cell {
+    grid-area: action;
+    flex-direction: column;
+  }
+
+  #tradeFlowRows tr {
+    grid-template-areas:
+      "date side price shares action"
+      "symbol amount amount fee action";
+  }
+
+  #matchedRows .sell-date-cell { grid-area: sell-date; }
+  #matchedRows .symbol-cell { grid-area: symbol; }
+  #matchedRows .sell-price-cell { grid-area: sell-price; }
+  #matchedRows .buy-date-cell { grid-area: buy-date; }
+  #matchedRows .buy-price-cell { grid-area: buy-price; }
+  #matchedRows .shares-cell { grid-area: shares; }
+  #matchedRows .amount-cell { grid-area: amount; }
+  #matchedRows .fee-cell { grid-area: fee; }
+  #matchedRows .profit-cell { grid-area: profit; }
+
+  #matchedRows tr {
+    grid-template-areas:
+      "sell-date sell-price shares profit amount"
+      "symbol buy-date buy-price fee amount";
+  }
+
+  #unmatchedRows .date-cell { grid-area: date; }
+  #unmatchedRows .symbol-cell { grid-area: symbol; }
+  #unmatchedRows .side-cell { grid-area: side; }
+  #unmatchedRows .price-cell { grid-area: price; }
+  #unmatchedRows .shares-cell { grid-area: shares; }
+  #unmatchedRows .amount-cell { grid-area: amount; }
+  #unmatchedRows .fee-cell { grid-area: fee; }
+
+  #unmatchedRows tr {
+    grid-template-areas:
+      "date side price shares amount"
+      "symbol side fee fee amount";
+  }
+
   .panel > .panel-title {
     min-height: 0;
     padding: 12px;
