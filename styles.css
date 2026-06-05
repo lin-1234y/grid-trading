@@ -421,14 +421,32 @@ p {
   color: var(--danger);
 }
 
+.profit-metric em {
+  display: block;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 750;
+}
+
+.profit-metric b {
+  color: var(--ink);
+  font-weight: 850;
+}
+
 .profit-positive {
   color: #047857;
   font-weight: 850;
+  border-radius: 6px;
+  background: rgba(4, 120, 87, 0.09);
 }
 
 .profit-negative {
   color: var(--danger);
   font-weight: 850;
+  border-radius: 6px;
+  background: rgba(194, 65, 54, 0.10);
 }
 
 .profit-flat {
@@ -877,10 +895,10 @@ tbody tr:hover {
 
   tbody tr {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 6px;
-    margin: 8px 0;
-    padding: 9px;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 5px;
+    margin: 7px 0;
+    padding: 8px;
     border: 1px solid var(--line);
     border-radius: 8px;
     background: #fff;
@@ -913,8 +931,9 @@ tbody tr:hover {
   }
 
   td[data-label] {
-    font-size: 12px;
-    line-height: 1.25;
+    font-size: 11px;
+    line-height: 1.18;
+    overflow: hidden;
   }
 
   td[data-label="操作"] {
@@ -935,6 +954,20 @@ tbody tr:hover {
     display: block;
     grid-column: 1 / -1;
     padding: 16px;
+  }
+
+  .action-cell {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+  }
+
+  .action-cell button {
+    width: auto;
+    min-height: 28px;
+    flex: 1 1 36px;
+    padding: 0 4px;
+    font-size: 11px;
   }
 
   .panel > .panel-title {

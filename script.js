@@ -479,9 +479,9 @@ function renderAllTrades(editId = "") {
   const sorted = [...visible].sort((a, b) => `${a.date}-${a.createdAt}`.localeCompare(`${b.date}-${b.createdAt}`));
   els.tradeFlowRows.innerHTML = sorted.length ? sorted.map((t, i) => {
     if (t.id === editId) {
-      return `<tr data-id="${t.id}" class="edit-row">${cell("序号", i + 1)}${cell("日期", `<input data-edit="date" type="date" value="${esc(t.date)}">`)}${cell("代码", `<input data-edit="symbol" value="${esc(t.symbol)}">`)}${cell("方向", `<select data-edit="side"><option value="buy"${t.side === "buy" ? " selected" : ""}>买入</option><option value="sell"${t.side === "sell" ? " selected" : ""}>卖出</option></select>`)}${cell("价格", `<input data-edit="price" type="number" step="0.001" value="${t.price}">`)}${cell("股数", `<input data-edit="shares" type="number" step="100" value="${t.shares}">`)}${cell("成交金额", money(t.amount))}${cell("费用", `<input data-edit="fee" type="number" step="0.01" value="${t.fee}">`)}${cell("操作", `<button data-action="save">保存</button><button data-action="cancel">取消</button>`)}</tr>`;
+      return `<tr data-id="${t.id}" class="edit-row">${cell("序号", i + 1)}${cell("日期", `<input data-edit="date" type="date" value="${esc(t.date)}">`)}${cell("代码", `<input data-edit="symbol" value="${esc(t.symbol)}">`)}${cell("方向", `<select data-edit="side"><option value="buy"${t.side === "buy" ? " selected" : ""}>买入</option><option value="sell"${t.side === "sell" ? " selected" : ""}>卖出</option></select>`)}${cell("价格", `<input data-edit="price" type="number" step="0.001" value="${t.price}">`)}${cell("股数", `<input data-edit="shares" type="number" step="100" value="${t.shares}">`)}${cell("成交金额", money(t.amount))}${cell("费用", `<input data-edit="fee" type="number" step="0.01" value="${t.fee}">`)}${cell("操作", `<button data-action="save">保存</button><button data-action="cancel">取消</button>`, "action-cell")}</tr>`;
     }
-    return `<tr data-id="${t.id}">${cell("序号", i + 1)}${cell("日期", esc(t.date))}${cell("代码", esc(t.symbol))}${cell("方向", t.side === "buy" ? "买入" : "卖出")}${cell("价格", money(t.price))}${cell("股数", qty(t.shares))}${cell("成交金额", money(t.amount))}${cell("费用", money(t.fee))}${cell("操作", `<button data-action="edit">编辑</button><button data-action="delete">删除</button>`)}</tr>`;
+    return `<tr data-id="${t.id}">${cell("序号", i + 1)}${cell("日期", esc(t.date))}${cell("代码", esc(t.symbol))}${cell("方向", t.side === "buy" ? "买入" : "卖出")}${cell("价格", money(t.price))}${cell("股数", qty(t.shares))}${cell("成交金额", money(t.amount))}${cell("费用", money(t.fee))}${cell("操作", `<button data-action="edit">编辑</button><button data-action="delete">删除</button>`, "action-cell")}</tr>`;
   }).join("") : `<tr><td colspan="9" class="empty">${flowFilterSymbol ? `没有 ${esc(flowFilterSymbol)} 的交易流水。` : "还没有交易流水。"}</td></tr>`;
 }
 
@@ -530,7 +530,7 @@ function renderSymbolChoices() {
 }
 
 function renderFlowSymbolChoices() {
-  els.currentFlowSymbol.textContent = flowFilterSymbol ? `当前：${flowFilterSymbol}` : "当前：全部股票";
+  els.currentFlowSymbol.textContent = flowFilterSymbol ? `当前流水筛选：${flowFilterSymbol}` : "当前流水筛选：全部股票";
 }
 
 function openSymbolModal(mode) {
