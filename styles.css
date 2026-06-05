@@ -109,8 +109,8 @@ select:focus {
   position: sticky;
   top: 0;
   z-index: 5;
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
   padding: 4px 0 8px;
   background: rgba(237, 244, 247, 0.92);
@@ -118,11 +118,13 @@ select:focus {
 }
 
 .tab {
-  flex: 0 0 auto;
+  width: 100%;
+  min-width: 0;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.86);
   color: var(--ink);
   box-shadow: none;
+  white-space: nowrap;
 }
 
 .tab.active {
@@ -590,19 +592,31 @@ tbody tr:hover {
 
   .app-header p {
     margin-bottom: 0;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .eyebrow {
+    font-size: 11px;
   }
 
   .window-tabs {
-    flex-wrap: nowrap;
     margin: 0 -10px;
-    overflow-x: auto;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    overflow: visible;
     padding: 6px 10px 9px;
   }
 
   .tab {
-    min-width: max-content;
+    grid-column: span 2;
     min-height: 40px;
-    padding: 0 13px;
+    padding: 0 8px;
+    font-size: 13px;
+  }
+
+  .tab:nth-child(4),
+  .tab:nth-child(5) {
+    grid-column: span 3;
   }
 
   .sidebar,
@@ -622,11 +636,20 @@ tbody tr:hover {
     width: 100%;
   }
 
-  .metrics,
-  .scenario-grid,
   .match-grid,
+  .scenario-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .metrics,
   .field-grid,
   .form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .grid-card .form-grid,
+  #queryWindow .form-grid,
+  #settingsWindow .form-grid {
     grid-template-columns: 1fr;
   }
 
@@ -655,8 +678,7 @@ tbody tr:hover {
     width: 100%;
   }
 
-  .grid-card-head button,
-  .tab {
+  .grid-card-head button {
     width: auto;
   }
 }
@@ -673,5 +695,9 @@ tbody tr:hover {
 
   .metric {
     padding: 14px;
+  }
+
+  .metrics {
+    grid-template-columns: 1fr;
   }
 }
