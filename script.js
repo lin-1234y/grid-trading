@@ -1,0 +1,625 @@
+const els = {
+  tabs: document.querySelectorAll(".tab"),
+  windows: document.querySelectorAll(".tool-window"),
+  status: document.querySelector("#statusText"),
+  symbol: document.querySelector("#symbolInput"),
+  currentPrice: document.querySelector("#currentPriceInput"),
+  holdingShares: document.querySelector("#holdingSharesInput"),
+  costPrice: document.querySelector("#costPriceInput"),
+  cash: document.querySelector("#cashInput"),
+  lotSize: document.querySelector("#lotSizeInput"),
+  loadSymbol: document.querySelector("#loadSymbolButton"),
+  addGrid: document.querySelector("#addGridButton"),
+  runScenario: document.querySelector("#runScenarioButton"),
+  gridCards: document.querySelector("#gridCards"),
+  template: document.querySelector("#gridTemplate"),
+  upProfit: document.querySelector("#upProfit"),
+  downCash: document.querySelector("#downCash"),
+  downLoss: document.querySelector("#downLoss"),
+  reboundProfit: document.querySelector("#reboundProfit"),
+  upBox: document.querySelector("#upBox"),
+  downBox: document.querySelector("#downBox"),
+  reboundBox: document.querySelector("#reboundBox"),
+  detailRows: document.querySelector("#detailRows"),
+  detailSummary: document.querySelector("#detailSummary"),
+  tDate: document.querySelector("#tDateInput"),
+  tSymbol: document.querySelector("#tSymbolInput"),
+  tSide: document.querySelector("#tSideInput"),
+  tPrice: document.querySelector("#tPriceInput"),
+  tShares: document.querySelector("#tSharesInput"),
+  tFee: document.querySelector("#tFeeInput"),
+  tCommissionPct: document.querySelector("#tCommissionPctInput"),
+  tMinCommission: document.querySelector("#tMinCommissionInput"),
+  tStampDutyPct: document.querySelector("#tStampDutyPctInput"),
+  addTrade: document.querySelector("#addTradeButton"),
+  clearTrades: document.querySelector("#clearTradesButton"),
+  tradeFlowRows: document.querySelector("#tradeFlowRows"),
+  tFilterSymbol: document.querySelector("#tFilterSymbolInput"),
+  tStartDate: document.querySelector("#tStartDateInput"),
+  tEndDate: document.querySelector("#tEndDateInput"),
+  applyTradeFilter: document.querySelector("#applyTradeFilterButton"),
+  matchedRows: document.querySelector("#matchedRows"),
+  unmatchedRows: document.querySelector("#unmatchedRows"),
+  matchedSummary: document.querySelector("#matchedSummary"),
+  unmatchedSummary: document.querySelector("#unmatchedSummary"),
+  tMatchedProfit: document.querySelector("#tMatchedProfit"),
+  tMatchedShares: document.querySelector("#tMatchedShares"),
+  tOpenBuyShares: document.querySelector("#tOpenBuyShares"),
+  tOpenSellShares: document.querySelector("#tOpenSellShares"),
+  backupName: document.querySelector("#backupNameInput"),
+  exportBackup: document.querySelector("#exportBackupButton"),
+  importBackup: document.querySelector("#importBackupInput"),
+};
+
+if ("serviceWorker" in navigator && location.protocol !== "file:") {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  });
+}
+
+let grids = [];
+let scenarioRows = [];
+let trades = [];
+let saveTimer = 0;
+const STORAGE_KEY = "gridTradingToolState";
+
+function n(value, fallback = 0) {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function todayIso() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function uid() {
+  return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+}
+
+function money(value) {
+  return Number(value || 0).toLocaleString("zh-CN", { style: "currency", currency: "CNY", maximumFractionDigits: 2 });
+}
+
+function qty(value) {
+  return Number(value || 0).toLocaleString("zh-CN", { maximumFractionDigits: 0 });
+}
+
+function fixed(value) {
+  return Number(value || 0).toFixed(4);
+}
+
+function switchWindow(id, persist = true) {
+  els.tabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.window === id));
+  els.windows.forEach((win) => win.classList.toggle("active", win.id === id));
+  if (persist) saveState();
+}
+
+function defaultGrids() {
+  return [{
+    id: uid(),
+    lower: 3.4,
+    upper: 4.8,
+    buyStepType: "value",
+    buyStep: 0.15,
+    buyMode: "amount",
+    buySize: 10000,
+    sellStepType: "value",
+    sellStep: 0.15,
+    sellMode: "shares",
+    sellSize: 1000,
+  }];
+}
+
+function account() {
+  return {
+    symbol: els.symbol.value.trim().toUpperCase() || "GRID",
+    currentPrice: n(els.currentPrice.value),
+    holdingShares: Math.max(0, Math.floor(n(els.holdingShares.value))),
+    costPrice: n(els.costPrice.value),
+    cash: Math.max(0, n(els.cash.value)),
+    lotSize: Math.max(1, Math.floor(n(els.lotSize.value, 100))),
+    commissionPct: Math.max(0, n(els.tCommissionPct.value) / 100),
+    minCommission: Math.max(0, n(els.tMinCommission.value)),
+    stampDutyPct: Math.max(0, n(els.tStampDutyPct.value) / 100),
+  };
+}
+
+function renderGrids() {
+  els.gridCards.innerHTML = "";
+  grids.forEach((grid, index) => {
+    const node = els.template.content.firstElementChild.cloneNode(true);
+    node.dataset.id = grid.id;
+    node.querySelector(".grid-title").textContent = `网格 ${index + 1}`;
+    node.querySelectorAll("[data-field]").forEach((input) => {
+      input.value = grid[input.dataset.field];
+    });
+    els.gridCards.appendChild(node);
+  });
+}
+
+function collectState() {
+  if (els.gridCards.children.length) readGrids();
+  return {
+    activeWindow: document.querySelector(".tab.active")?.dataset.window || "scenarioWindow",
+    scenario: {
+      symbol: els.symbol.value,
+      currentPrice: els.currentPrice.value,
+      holdingShares: els.holdingShares.value,
+      costPrice: els.costPrice.value,
+      cash: els.cash.value,
+      lotSize: els.lotSize.value,
+      grids,
+    },
+    tradeForm: {
+      date: els.tDate.value,
+      symbol: els.tSymbol.value,
+      side: els.tSide.value,
+      price: els.tPrice.value,
+      shares: els.tShares.value,
+      fee: els.tFee.value,
+    },
+    settings: {
+      commissionPct: els.tCommissionPct.value,
+      minCommission: els.tMinCommission.value,
+      stampDutyPct: els.tStampDutyPct.value,
+      backupName: els.backupName.value,
+    },
+    query: {
+      symbol: els.tFilterSymbol.value,
+      startDate: els.tStartDate.value,
+      endDate: els.tEndDate.value,
+    },
+    trades,
+  };
+}
+
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(collectState()));
+  } catch {
+    els.status.textContent = "浏览器本地存储不可用，请导出备份保存。";
+  }
+}
+
+function scheduleSave() {
+  window.clearTimeout(saveTimer);
+  saveTimer = window.setTimeout(saveState, 150);
+}
+
+function restoreState() {
+  let state = null;
+  try {
+    state = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+  } catch {
+    state = null;
+  }
+  if (!state) return;
+  const sc = state.scenario || {};
+  if (sc.symbol !== undefined) els.symbol.value = sc.symbol;
+  if (sc.currentPrice !== undefined) els.currentPrice.value = sc.currentPrice;
+  if (sc.holdingShares !== undefined) els.holdingShares.value = sc.holdingShares;
+  if (sc.costPrice !== undefined) els.costPrice.value = sc.costPrice;
+  if (sc.cash !== undefined) els.cash.value = sc.cash;
+  if (sc.lotSize !== undefined) els.lotSize.value = sc.lotSize;
+  if (Array.isArray(sc.grids) && sc.grids.length) grids = sc.grids;
+  const tf = state.tradeForm || {};
+  if (tf.date !== undefined) els.tDate.value = tf.date;
+  if (tf.symbol !== undefined) els.tSymbol.value = tf.symbol;
+  if (tf.side !== undefined) els.tSide.value = tf.side;
+  if (tf.price !== undefined) els.tPrice.value = tf.price;
+  if (tf.shares !== undefined) els.tShares.value = tf.shares;
+  if (tf.fee !== undefined) els.tFee.value = tf.fee;
+  const settings = state.settings || {};
+  if (settings.commissionPct !== undefined) els.tCommissionPct.value = settings.commissionPct;
+  if (settings.minCommission !== undefined) els.tMinCommission.value = settings.minCommission;
+  if (settings.stampDutyPct !== undefined) els.tStampDutyPct.value = settings.stampDutyPct;
+  if (settings.backupName !== undefined) els.backupName.value = settings.backupName;
+  const query = state.query || {};
+  if (query.symbol !== undefined) els.tFilterSymbol.value = query.symbol;
+  if (query.startDate !== undefined) els.tStartDate.value = query.startDate;
+  if (query.endDate !== undefined) els.tEndDate.value = query.endDate;
+  if (Array.isArray(state.trades)) trades = state.trades;
+  if (state.activeWindow) switchWindow(state.activeWindow, false);
+}
+
+function readGrids() {
+  grids = Array.from(els.gridCards.querySelectorAll(".grid-card")).map((card) => {
+    const grid = { id: card.dataset.id };
+    card.querySelectorAll("[data-field]").forEach((input) => {
+      grid[input.dataset.field] = input.tagName === "SELECT" ? input.value : n(input.value);
+    });
+    return grid;
+  });
+}
+
+function addGrid(values = {}) {
+  readGrids();
+  grids.push({
+    id: uid(),
+    lower: values.lower ?? 3.4,
+    upper: values.upper ?? 4.8,
+    buyStepType: values.buyStepType ?? "value",
+    buyStep: values.buyStep ?? 0.15,
+    buyMode: values.buyMode ?? "amount",
+    buySize: values.buySize ?? 10000,
+    sellStepType: values.sellStepType ?? "value",
+    sellStep: values.sellStep ?? 0.15,
+    sellMode: values.sellMode ?? "shares",
+    sellSize: values.sellSize ?? 1000,
+  });
+  renderGrids();
+  saveState();
+}
+
+function stepPrice(price, grid, side) {
+  const type = side === "buy" ? grid.buyStepType : grid.sellStepType;
+  const step = side === "buy" ? grid.buyStep : grid.sellStep;
+  return type === "percent" ? price * (step / 100) : step;
+}
+
+function roundLot(shares, lotSize) {
+  return Math.floor(Math.max(0, shares) / lotSize) * lotSize;
+}
+
+function tradeFee(side, amount, acct = account()) {
+  if (amount <= 0) return 0;
+  const commission = Math.max(acct.minCommission, amount * acct.commissionPct);
+  const stamp = side === "sell" ? amount * acct.stampDutyPct : 0;
+  return commission + stamp;
+}
+
+function orderShares(price, grid, side, acct) {
+  const mode = side === "buy" ? grid.buyMode : grid.sellMode;
+  const size = side === "buy" ? grid.buySize : grid.sellSize;
+  return mode === "shares" ? roundLot(size, acct.lotSize) : roundLot(size / price, acct.lotSize);
+}
+
+function buyEvents(acct, activeGrids) {
+  const events = [];
+  activeGrids.forEach((grid, gridIndex) => {
+    let price = acct.currentPrice - stepPrice(acct.currentPrice, grid, "buy");
+    for (let guard = 0; price >= grid.lower && price > 0 && guard < 500; guard += 1) {
+      if (price <= grid.upper) {
+        const shares = orderShares(price, grid, "buy", acct);
+        const amount = shares * price;
+        const fee = tradeFee("buy", amount, acct);
+        if (shares > 0) events.push({ gridIndex, side: "买入", price, shares, amount, fee });
+      }
+      price -= stepPrice(price, grid, "buy");
+    }
+  });
+  return events.sort((a, b) => b.price - a.price);
+}
+
+function sellEvents(acct, activeGrids) {
+  const events = [];
+  activeGrids.forEach((grid, gridIndex) => {
+    let price = acct.currentPrice + stepPrice(acct.currentPrice, grid, "sell");
+    for (let guard = 0; price <= grid.upper && guard < 500; guard += 1) {
+      if (price >= grid.lower) {
+        const shares = orderShares(price, grid, "sell", acct);
+        const amount = shares * price;
+        const fee = tradeFee("sell", amount, acct);
+        if (shares > 0) events.push({ gridIndex, side: "卖出", price, shares, amount, fee });
+      }
+      price += stepPrice(price, grid, "sell");
+    }
+  });
+  return events.sort((a, b) => a.price - b.price);
+}
+
+function scenarioRow(scenario, event, shares, amount, fee, note = "") {
+  return { scenario, grid: `网格 ${event.gridIndex + 1}`, side: event.side, price: event.price, shares, amount, fee, note };
+}
+
+function runScenarios() {
+  readGrids();
+  const acct = account();
+  if (acct.currentPrice <= 0 || !grids.length) {
+    els.status.textContent = "请填写当前价，并至少保留一组网格。";
+    return;
+  }
+  const upper = Math.max(acct.currentPrice, ...grids.map((g) => g.upper));
+  const lower = Math.min(acct.currentPrice, ...grids.map((g) => g.lower));
+  const originalCost = acct.holdingShares * acct.costPrice;
+
+  let upShares = acct.holdingShares;
+  let upCash = 0;
+  const upRows = [];
+  sellEvents(acct, grids).forEach((event) => {
+    if (upShares <= 0) return;
+    const sold = Math.min(event.shares, upShares);
+    const amount = sold * event.price;
+    const fee = tradeFee("sell", amount, acct);
+    upShares -= sold;
+    upCash += amount - fee;
+    upRows.push(scenarioRow("单边上涨", event, sold, amount, fee));
+  });
+  const upFinal = upShares * upper;
+  const upProfit = upFinal + upCash - originalCost;
+
+  let downShares = acct.holdingShares;
+  let downCash = 0;
+  const downRows = [];
+  buyEvents(acct, grids).forEach((event) => {
+    downShares += event.shares;
+    downCash += event.amount + event.fee;
+    downRows.push(scenarioRow("单边下跌", event, event.shares, event.amount, event.fee));
+  });
+  const downValue = downShares * lower;
+  const downLoss = originalCost + downCash - downValue;
+
+  let reboundShares = acct.holdingShares;
+  let reboundBuy = 0;
+  let reboundSell = 0;
+  const reboundRows = [];
+  buyEvents(acct, grids).forEach((event) => {
+    reboundShares += event.shares;
+    reboundBuy += event.amount + event.fee;
+    reboundRows.push(scenarioRow("先跌后涨", event, event.shares, event.amount, event.fee, "下跌阶段"));
+  });
+  sellEvents({ ...acct, currentPrice: lower }, grids).forEach((event) => {
+    if (reboundShares <= 0) return;
+    const sold = Math.min(event.shares, reboundShares);
+    const amount = sold * event.price;
+    const fee = tradeFee("sell", amount, acct);
+    reboundShares -= sold;
+    reboundSell += amount - fee;
+    reboundRows.push(scenarioRow("先跌后涨", event, sold, amount, fee, "反弹阶段"));
+  });
+  const reboundProfit = reboundShares * upper + reboundSell - originalCost - reboundBuy;
+
+  scenarioRows = [...upRows, ...downRows, ...reboundRows];
+  els.upProfit.textContent = money(upProfit);
+  els.downCash.textContent = money(downCash);
+  els.downLoss.textContent = money(downLoss);
+  els.reboundProfit.textContent = money(reboundProfit);
+  els.upBox.innerHTML = boxRows([["到达价格", money(upper)], ["卖出现金", money(upCash)], ["剩余股数", `${qty(upShares)} 股`], ["剩余市值", money(upFinal)], ["总体收益", money(upProfit)]]);
+  els.downBox.innerHTML = boxRows([["到达价格", money(lower)], ["总体补仓金额", money(downCash)], ["可用现金不足还需", money(Math.max(0, downCash - acct.cash))], ["最终股数", `${qty(downShares)} 股`], ["总体亏损", money(downLoss)]]);
+  els.reboundBox.innerHTML = boxRows([["先跌到", money(lower)], ["再涨到", money(upper)], ["补仓金额", money(reboundBuy)], ["卖出现金", money(reboundSell)], ["总体盈利", money(reboundProfit)]]);
+  els.detailRows.innerHTML = scenarioRows.length ? scenarioRows.map((r, i) => `<tr><td>${i + 1}</td><td>${r.scenario}</td><td>${r.grid}</td><td>${r.side}</td><td>${money(r.price)}</td><td>${qty(r.shares)}</td><td>${money(r.amount)}</td><td>${money(r.fee)}</td><td>${r.note || "-"}</td></tr>`).join("") : `<tr><td colspan="9" class="empty">没有触发任何网格。</td></tr>`;
+  els.detailSummary.textContent = `${scenarioRows.length} 条触发明细`;
+  els.status.textContent = `${acct.symbol} 已完成三种情形推演。`;
+  saveState();
+}
+
+function boxRows(rows) {
+  return rows.map(([label, value]) => `<div><span>${label}</span><strong>${value}</strong></div>`).join("");
+}
+
+async function loadSymbolData() {
+  try {
+    const response = await fetch(`/api/quotes?symbol=${encodeURIComponent(els.symbol.value.trim())}`, { cache: "no-store" });
+    const payload = await response.json();
+    const rows = payload.rows || [];
+    if (!rows.length) {
+      els.status.textContent = "没有找到本地行情，可以手动填写当前价。";
+      return;
+    }
+    els.currentPrice.value = Number(rows[rows.length - 1].close).toFixed(3);
+    els.status.textContent = `已加载最新价 ${els.currentPrice.value}`;
+    runScenarios();
+  } catch (err) {
+    els.status.textContent = `行情加载失败：${err.message}`;
+  }
+}
+
+function loadTrades() {
+  try {
+    trades = JSON.parse(localStorage.getItem("gridTradingTrades") || "[]");
+  } catch {
+    trades = [];
+  }
+}
+
+function saveTrades() {
+  localStorage.setItem("gridTradingTrades", JSON.stringify(trades));
+  saveState();
+}
+
+function addTrade() {
+  const symbol = els.tSymbol.value.trim().toUpperCase();
+  const side = els.tSide.value;
+  const price = n(els.tPrice.value);
+  const shares = Math.floor(n(els.tShares.value));
+  if (!symbol || price <= 0 || shares <= 0) {
+    els.status.textContent = "新增交易需要填写代码、成交价和股数。";
+    return;
+  }
+  const amount = price * shares;
+  const fee = els.tFee.value.trim() ? Math.max(0, n(els.tFee.value)) : tradeFee(side, amount);
+  trades.push({ id: uid(), date: els.tDate.value || todayIso(), symbol, side, price, shares, amount, fee, createdAt: Date.now() });
+  saveTrades();
+  els.tFee.value = "";
+  renderAllTrades();
+  renderQuery();
+  switchWindow("flowWindow");
+}
+
+function renderAllTrades(editId = "") {
+  const sorted = [...trades].sort((a, b) => `${a.date}-${a.createdAt}`.localeCompare(`${b.date}-${b.createdAt}`));
+  els.tradeFlowRows.innerHTML = sorted.length ? sorted.map((t, i) => {
+    if (t.id === editId) {
+      return `<tr data-id="${t.id}"><td>${i + 1}</td><td><input data-edit="date" type="date" value="${t.date}"></td><td><input data-edit="symbol" value="${t.symbol}"></td><td><select data-edit="side"><option value="buy"${t.side === "buy" ? " selected" : ""}>买入</option><option value="sell"${t.side === "sell" ? " selected" : ""}>卖出</option></select></td><td><input data-edit="price" type="number" step="0.001" value="${t.price}"></td><td><input data-edit="shares" type="number" step="100" value="${t.shares}"></td><td>${money(t.amount)}</td><td><input data-edit="fee" type="number" step="0.01" value="${t.fee}"></td><td><button data-action="save">保存</button><button data-action="cancel">取消</button></td></tr>`;
+    }
+    return `<tr data-id="${t.id}"><td>${i + 1}</td><td>${t.date}</td><td>${t.symbol}</td><td>${t.side === "buy" ? "买入" : "卖出"}</td><td>${money(t.price)}</td><td>${qty(t.shares)}</td><td>${money(t.amount)}</td><td>${money(t.fee)}</td><td><button data-action="edit">编辑</button><button data-action="delete">删除</button></td></tr>`;
+  }).join("") : `<tr><td colspan="9" class="empty">还没有交易流水。</td></tr>`;
+}
+
+function editTradeFromRow(row) {
+  const trade = trades.find((t) => t.id === row.dataset.id);
+  if (!trade) return;
+  const get = (name) => row.querySelector(`[data-edit="${name}"]`).value;
+  trade.date = get("date");
+  trade.symbol = get("symbol").trim().toUpperCase();
+  trade.side = get("side");
+  trade.price = n(get("price"));
+  trade.shares = Math.floor(n(get("shares")));
+  trade.amount = trade.price * trade.shares;
+  trade.fee = Math.max(0, n(get("fee")));
+  saveTrades();
+  renderAllTrades();
+  renderQuery();
+}
+
+function filteredTrades() {
+  const symbol = els.tFilterSymbol.value.trim().toUpperCase();
+  const start = els.tStartDate.value;
+  const end = els.tEndDate.value;
+  return trades.filter((t) => !symbol || t.symbol === symbol).filter((t) => !start || t.date >= start).filter((t) => !end || t.date <= end).sort((a, b) => `${a.date}-${a.createdAt}`.localeCompare(`${b.date}-${b.createdAt}`));
+}
+
+function matchTrades(rows) {
+  const matched = [];
+  const unmatched = [];
+  const bySymbol = new Map();
+  rows.forEach((t) => {
+    if (!bySymbol.has(t.symbol)) bySymbol.set(t.symbol, []);
+    bySymbol.get(t.symbol).push({ ...t, remaining: t.shares, remainingFee: t.fee });
+  });
+  bySymbol.forEach((items, symbol) => {
+    const open = [];
+    items.forEach((trade) => {
+      while (trade.remaining > 0) {
+        const index = findOpposite(open, trade.side);
+        if (index < 0) break;
+        const other = open[index];
+        const shares = Math.min(trade.remaining, other.remaining);
+        const buy = trade.side === "buy" ? trade : other;
+        const sell = trade.side === "sell" ? trade : other;
+        const buyFee = buy.fee * (shares / buy.shares);
+        const sellFee = sell.fee * (shares / sell.shares);
+        matched.push({ symbol, sellDate: sell.date, sellPrice: sell.price, buyDate: buy.date, buyPrice: buy.price, shares, amount: shares * ((buy.price + sell.price) / 2), fee: buyFee + sellFee, profit: (sell.price - buy.price) * shares - buyFee - sellFee });
+        trade.remaining -= shares;
+        other.remaining -= shares;
+        trade.remainingFee = Math.max(0, trade.remainingFee - trade.fee * (shares / trade.shares));
+        other.remainingFee = Math.max(0, other.remainingFee - other.fee * (shares / other.shares));
+        if (other.remaining <= 0) open.splice(index, 1);
+      }
+      if (trade.remaining > 0) open.push(trade);
+    });
+    unmatched.push(...open.filter((t) => t.remaining > 0));
+  });
+  return { matched, unmatched };
+}
+
+function findOpposite(open, side) {
+  for (let i = open.length - 1; i >= 0; i -= 1) {
+    if (open[i].side !== side) return i;
+  }
+  return -1;
+}
+
+function renderQuery() {
+  const { matched, unmatched } = matchTrades(filteredTrades());
+  const profit = matched.reduce((sum, r) => sum + r.profit, 0);
+  const matchedShares = matched.reduce((sum, r) => sum + r.shares, 0);
+  const openBuy = unmatched.filter((r) => r.side === "buy").reduce((sum, r) => sum + r.remaining, 0);
+  const openSell = unmatched.filter((r) => r.side === "sell").reduce((sum, r) => sum + r.remaining, 0);
+  els.tMatchedProfit.textContent = money(profit);
+  els.tMatchedShares.textContent = `${qty(matchedShares)} 股`;
+  els.tOpenBuyShares.textContent = `${qty(openBuy)} 股`;
+  els.tOpenSellShares.textContent = `${qty(openSell)} 股`;
+  els.matchedSummary.textContent = `${matched.length} 组匹配`;
+  els.unmatchedSummary.textContent = `${unmatched.length} 条未匹配`;
+  els.matchedRows.innerHTML = matched.length ? matched.map((r, i) => `<tr><td>${i + 1}</td><td>${r.symbol}</td><td>${r.sellDate}</td><td>${money(r.sellPrice)}</td><td>${r.buyDate}</td><td>${money(r.buyPrice)}</td><td>${qty(r.shares)}</td><td>${money(r.amount)}</td><td>${money(r.fee)}</td><td>${money(r.profit)}</td></tr>`).join("") : `<tr><td colspan="10" class="empty">还没有可匹配的反向交易。</td></tr>`;
+  els.unmatchedRows.innerHTML = unmatched.length ? unmatched.map((r, i) => `<tr><td>${i + 1}</td><td>${r.date}</td><td>${r.symbol}</td><td>${r.side === "buy" ? "买入" : "卖出"}</td><td>${money(r.price)}</td><td>${qty(r.remaining)}</td><td>${money(r.remaining * r.price)}</td><td>${money(r.remainingFee)}</td></tr>`).join("") : `<tr><td colspan="8" class="empty">没有未匹配交易。</td></tr>`;
+}
+
+function exportBackup() {
+  const name = (els.backupName.value.trim() || "网格交易-备份").includes("网格交易") ? els.backupName.value.trim() || "网格交易-备份" : `网格交易-${els.backupName.value.trim()}`;
+  const payload = { ...collectState(), name, type: "grid-trading-backup", exportedAt: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `${name}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
+async function importBackup(file) {
+  if (!file) return;
+  const payload = JSON.parse(await file.text());
+  if (!Array.isArray(payload.trades)) {
+    els.status.textContent = "备份文件不正确。";
+    return;
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  trades = payload.trades;
+  restoreState();
+  renderGrids();
+  runScenarios();
+  renderAllTrades();
+  renderQuery();
+  saveTrades();
+  els.status.textContent = `已导入备份：${payload.name || file.name}`;
+}
+
+function clearTrades() {
+  if (!confirm("确认清空全部交易流水？")) return;
+  trades = [];
+  saveTrades();
+  renderAllTrades();
+  renderQuery();
+  saveState();
+}
+
+els.tabs.forEach((tab) => tab.addEventListener("click", () => switchWindow(tab.dataset.window)));
+els.addGrid.addEventListener("click", () => addGrid());
+document.addEventListener("input", (event) => {
+  if (event.target.matches("input, select")) scheduleSave();
+});
+document.addEventListener("change", (event) => {
+  if (event.target.matches("input, select")) {
+    if (event.target === els.importBackup) return;
+    saveState();
+  }
+});
+els.gridCards.addEventListener("input", () => {
+  readGrids();
+  scheduleSave();
+});
+els.gridCards.addEventListener("click", (event) => {
+  const button = event.target.closest(".delete-grid");
+  if (!button) return;
+  button.closest(".grid-card").remove();
+  readGrids();
+  if (!grids.length) addGrid();
+  saveState();
+});
+els.runScenario.addEventListener("click", runScenarios);
+els.loadSymbol.addEventListener("click", loadSymbolData);
+els.addTrade.addEventListener("click", addTrade);
+els.tradeFlowRows.addEventListener("click", (event) => {
+  const row = event.target.closest("tr");
+  const action = event.target.dataset.action;
+  if (!row || !action) return;
+  if (action === "edit") renderAllTrades(row.dataset.id);
+  if (action === "cancel") renderAllTrades();
+  if (action === "save") editTradeFromRow(row);
+  if (action === "delete") {
+    trades = trades.filter((t) => t.id !== row.dataset.id);
+    saveTrades();
+    renderAllTrades();
+    renderQuery();
+  }
+});
+els.applyTradeFilter.addEventListener("click", () => {
+  renderQuery();
+  saveState();
+});
+els.exportBackup.addEventListener("click", exportBackup);
+els.importBackup.addEventListener("change", () => importBackup(els.importBackup.files[0]).catch((err) => { els.status.textContent = err.message; }));
+els.clearTrades.addEventListener("click", clearTrades);
+
+grids = defaultGrids();
+loadTrades();
+restoreState();
+if (!els.tDate.value) els.tDate.value = todayIso();
+renderGrids();
+runScenarios();
+renderAllTrades();
+renderQuery();
+saveState();

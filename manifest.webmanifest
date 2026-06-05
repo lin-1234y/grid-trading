@@ -1,0 +1,19 @@
+{
+  "name": "网格交易工具",
+  "short_name": "网格交易",
+  "description": "独立的网格交易情景推演、T 操作收益和交易流水工具。",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#eef3f5",
+  "theme_color": "#115e59",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
