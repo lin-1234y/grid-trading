@@ -52,6 +52,7 @@ const els = {
   unmatchedSummary: document.querySelector("#unmatchedSummary"),
   tMatchedProfit: document.querySelector("#tMatchedProfit"),
   tTotalFees: document.querySelector("#tTotalFees"),
+  tTotalAmount: document.querySelector("#tTotalAmount"),
   tMatchedShares: document.querySelector("#tMatchedShares"),
   tOpenBuyShares: document.querySelector("#tOpenBuyShares"),
   tOpenSellShares: document.querySelector("#tOpenSellShares"),
@@ -592,12 +593,14 @@ function renderQuery() {
   const { matched, unmatched } = matchTrades(rows);
   const profit = matched.reduce((sum, r) => sum + r.profit, 0);
   const totalFees = rows.reduce((sum, r) => sum + Number(r.fee || 0), 0);
+  const totalAmount = rows.reduce((sum, r) => sum + Number(r.amount || r.price * r.shares || 0), 0);
   const matchedShares = matched.reduce((sum, r) => sum + r.shares, 0);
   const openBuy = unmatched.filter((r) => r.side === "buy").reduce((sum, r) => sum + r.remaining, 0);
   const openSell = unmatched.filter((r) => r.side === "sell").reduce((sum, r) => sum + r.remaining, 0);
   els.tMatchedProfit.textContent = money(profit);
   els.tMatchedProfit.className = profitClass(profit);
   els.tTotalFees.textContent = money(totalFees);
+  els.tTotalAmount.textContent = money(totalAmount);
   els.tMatchedShares.textContent = `${qty(matchedShares)} 股`;
   els.tOpenBuyShares.textContent = `${qty(openBuy)} 股`;
   els.tOpenSellShares.textContent = `${qty(openSell)} 股`;
