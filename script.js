@@ -34,6 +34,8 @@ const els = {
   addTrade: document.querySelector("#addTradeButton"),
   clearTrades: document.querySelector("#clearTradesButton"),
   tradeFlowRows: document.querySelector("#tradeFlowRows"),
+  overviewRows: document.querySelector("#overviewRows"),
+  overviewSummary: document.querySelector("#overviewSummary"),
   currentFlowSymbol: document.querySelector("#currentFlowSymbol"),
   openFlowSymbolPicker: document.querySelector("#openFlowSymbolPicker"),
   tFilterSymbol: document.querySelector("#tFilterSymbolInput"),
@@ -470,6 +472,7 @@ function addTrade() {
   saveTrades();
   els.tFee.value = "";
   renderAllTrades();
+  renderOverview();
   renderQuery();
   switchWindow("flowWindow");
 }
@@ -486,6 +489,33 @@ function renderAllTrades(editId = "") {
   }).join("") : `<tr><td colspan="9" class="empty">${flowFilterSymbol ? `没有 ${esc(flowFilterSymbol)} 的交易流水。` : "还没有交易流水。"}</td></tr>`;
 }
 
+function renderOverview() {
+  const bySymbol = new Map();
+  trades.forEach((trade) => {
+    if (!trade.symbol) return;
+    if (!bySymbol.has(trade.symbol)) {
+      bySymbol.set(trade.symbol, { symbol: trade.symbol, count: 0, amount: 0, fee: 0, lastDate: "", rows: [] });
+    }
+    const row = bySymbol.get(trade.symbol);
+    row.count += 1;
+    row.amount += Number(trade.amount || trade.price * trade.shares || 0);
+    row.fee += Number(trade.fee || 0);
+    row.lastDate = row.lastDate && row.lastDate > trade.date ? row.lastDate : trade.date;
+    row.rows.push(trade);
+  });
+  const rows = [...bySymbol.values()].map((item) => {
+    const { matched, unmatched } = matchTrades(item.rows.sort((a, b) => `${a.date}-${a.createdAt}`.localeCompare(`${b.date}-${b.createdAt}`)));
+    return {
+      ...item,
+      profit: matched.reduce((sum, r) => sum + r.profit, 0),
+      openBuy: unmatched.filter((r) => r.side === "buy").reduce((sum, r) => sum + r.remaining, 0),
+      openSell: unmatched.filter((r) => r.side === "sell").reduce((sum, r) => sum + r.remaining, 0),
+    };
+  }).sort((a, b) => b.lastDate.localeCompare(a.lastDate) || a.symbol.localeCompare(b.symbol));
+  els.overviewSummary.textContent = `${rows.length} 只股票`;
+  els.overviewRows.innerHTML = rows.length ? rows.map((r, i) => `<tr>${cell("序号", i + 1)}${cell("代码", esc(r.symbol))}${cell("交易次数", qty(r.count))}${cell("总成交金额", money(r.amount))}${cell("总费用", money(r.fee))}${cell("已匹配盈亏", money(r.profit), profitClass(r.profit))}${cell("未匹配买入", `${qty(r.openBuy)} 股`)}${cell("未匹配卖出", `${qty(r.openSell)} 股`)}${cell("最后交易日", esc(r.lastDate || "-"))}${cell("操作", `<button data-action="view-symbol" data-symbol="${esc(r.symbol)}">查看</button>`, "action-cell")}</tr>`).join("") : `<tr><td colspan="10" class="empty">还没有交易流水。</td></tr>`;
+}
+
 function editTradeFromRow(row) {
   const trade = trades.find((t) => t.id === row.dataset.id);
   if (!trade) return;
@@ -499,6 +529,7 @@ function editTradeFromRow(row) {
   trade.fee = Math.max(0, n(get("fee")));
   saveTrades();
   renderAllTrades();
+  renderOverview();
   renderQuery();
 }
 
@@ -635,6 +666,7 @@ async function importBackup(file) {
   renderGrids();
   runScenarios();
   renderAllTrades();
+  renderOverview();
   renderQuery();
   saveTrades();
   els.status.textContent = `已导入备份：${payload.name || file.name}`;
@@ -645,6 +677,7 @@ function clearTrades() {
   trades = [];
   saveTrades();
   renderAllTrades();
+  renderOverview();
   renderQuery();
   saveState();
 }
@@ -686,8 +719,17 @@ els.tradeFlowRows.addEventListener("click", (event) => {
     trades = trades.filter((t) => t.id !== row.dataset.id);
     saveTrades();
     renderAllTrades();
+    renderOverview();
     renderQuery();
   }
+});
+els.overviewRows.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-action='view-symbol']");
+  if (!button) return;
+  els.tFilterSymbol.value = button.dataset.symbol || "";
+  renderQuery();
+  switchWindow("queryWindow");
+  saveState();
 });
 els.openFlowSymbolPicker.addEventListener("click", () => openSymbolModal("flow"));
 els.openQuerySymbolPicker.addEventListener("click", () => openSymbolModal("query"));
@@ -721,5 +763,6 @@ if (!els.tDate.value) els.tDate.value = todayIso();
 renderGrids();
 runScenarios();
 renderAllTrades();
+renderOverview();
 renderQuery();
 saveState();
