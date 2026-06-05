@@ -1,6 +1,8 @@
 const els = {
   tabs: document.querySelectorAll(".tab"),
   windows: document.querySelectorAll(".tool-window"),
+  scenarioWindow: document.querySelector("#scenarioWindow"),
+  scenarioTabs: document.querySelectorAll(".scenario-tab"),
   status: document.querySelector("#statusText"),
   symbol: document.querySelector("#symbolInput"),
   currentPrice: document.querySelector("#currentPriceInput"),
@@ -127,6 +129,13 @@ function switchWindow(id, persist = true) {
   els.tabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.window === id));
   els.windows.forEach((win) => win.classList.toggle("active", win.id === id));
   if (persist) saveState();
+}
+
+function switchScenarioPane(id) {
+  const pane = id.replace("scenario", "").replace("Pane", "").toLowerCase() || "setup";
+  els.scenarioTabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.scenarioPane === id));
+  els.scenarioWindow.dataset.scenarioPane = pane;
+  renderScenarioDetails();
 }
 
 function defaultGrids() {
@@ -348,8 +357,16 @@ function sellEvents(acct, activeGrids) {
   return events.sort((a, b) => a.price - b.price);
 }
 
-function scenarioRow(scenario, event, shares, amount, fee, note = "") {
-  return { scenario, grid: `网格 ${event.gridIndex + 1}`, side: event.side, price: event.price, shares, amount, fee, note };
+function scenarioRow(type, scenario, event, shares, amount, fee, note = "") {
+  return { type, scenario, grid: `网格 ${event.gridIndex + 1}`, side: event.side, price: event.price, shares, amount, fee, note };
+}
+
+function renderScenarioDetails() {
+  const pane = els.scenarioWindow.dataset.scenarioPane || "setup";
+  const visible = ["up", "down", "rebound"].includes(pane) ? scenarioRows.filter((r) => r.type === pane) : scenarioRows;
+  els.detailRows.innerHTML = visible.length ? visible.map((r, i) => `<tr class="scenario-${esc(r.type)}-row">${cell("序号", i + 1)}${cell("情形", esc(r.scenario), "tag-cell")}${cell("网格", esc(r.grid), "tag-cell")}${cell("方向", esc(r.side))}${cell("触发价", money(r.price))}${cell("股数", qty(r.shares))}${cell("成交金额", money(r.amount))}${cell("费用", money(r.fee))}${cell("说明", esc(r.note || "-"))}</tr>`).join("") : `<tr><td colspan="9" class="empty">没有触发任何网格。</td></tr>`;
+  const label = { up: "单边上涨", down: "单边下跌", rebound: "先跌后涨" }[pane] || "全部";
+  els.detailSummary.textContent = `${label} ${visible.length} 条触发明细`;
 }
 
 function runScenarios() {
@@ -373,7 +390,7 @@ function runScenarios() {
     const fee = tradeFee("sell", amount, acct);
     upShares -= sold;
     upCash += amount - fee;
-    upRows.push(scenarioRow("单边上涨", event, sold, amount, fee));
+    upRows.push(scenarioRow("up", "单边上涨", event, sold, amount, fee));
   });
   const upFinal = upShares * upper;
   const upProfit = upFinal + upCash - originalCost;
@@ -384,7 +401,7 @@ function runScenarios() {
   buyEvents(acct, grids).forEach((event) => {
     downShares += event.shares;
     downCash += event.amount + event.fee;
-    downRows.push(scenarioRow("单边下跌", event, event.shares, event.amount, event.fee));
+    downRows.push(scenarioRow("down", "单边下跌", event, event.shares, event.amount, event.fee));
   });
   const downValue = downShares * lower;
   const downLoss = originalCost + downCash - downValue;
@@ -396,7 +413,7 @@ function runScenarios() {
   buyEvents(acct, grids).forEach((event) => {
     reboundShares += event.shares;
     reboundBuy += event.amount + event.fee;
-    reboundRows.push(scenarioRow("先跌后涨", event, event.shares, event.amount, event.fee, "下跌阶段"));
+    reboundRows.push(scenarioRow("rebound", "先跌后涨", event, event.shares, event.amount, event.fee, "下跌阶段"));
   });
   sellEvents({ ...acct, currentPrice: lower }, grids).forEach((event) => {
     if (reboundShares <= 0) return;
@@ -405,7 +422,7 @@ function runScenarios() {
     const fee = tradeFee("sell", amount, acct);
     reboundShares -= sold;
     reboundSell += amount - fee;
-    reboundRows.push(scenarioRow("先跌后涨", event, sold, amount, fee, "反弹阶段"));
+    reboundRows.push(scenarioRow("rebound", "先跌后涨", event, sold, amount, fee, "反弹阶段"));
   });
   const reboundProfit = reboundShares * upper + reboundSell - originalCost - reboundBuy;
 
@@ -417,8 +434,7 @@ function runScenarios() {
   els.upBox.innerHTML = boxRows([["到达价格", money(upper)], ["卖出现金", money(upCash)], ["剩余股数", `${qty(upShares)} 股`], ["剩余市值", money(upFinal)], ["总体收益", money(upProfit)]]);
   els.downBox.innerHTML = boxRows([["到达价格", money(lower)], ["总体补仓金额", money(downCash)], ["可用现金不足还需", money(Math.max(0, downCash - acct.cash))], ["最终股数", `${qty(downShares)} 股`], ["总体亏损", money(downLoss)]]);
   els.reboundBox.innerHTML = boxRows([["先跌到", money(lower)], ["再涨到", money(upper)], ["补仓金额", money(reboundBuy)], ["卖出现金", money(reboundSell)], ["总体盈利", money(reboundProfit)]]);
-  els.detailRows.innerHTML = scenarioRows.length ? scenarioRows.map((r, i) => `<tr>${cell("序号", i + 1)}${cell("情形", esc(r.scenario), "tag-cell")}${cell("网格", esc(r.grid), "tag-cell")}${cell("方向", esc(r.side))}${cell("触发价", money(r.price))}${cell("股数", qty(r.shares))}${cell("成交金额", money(r.amount))}${cell("费用", money(r.fee))}${cell("说明", esc(r.note || "-"))}</tr>`).join("") : `<tr><td colspan="9" class="empty">没有触发任何网格。</td></tr>`;
-  els.detailSummary.textContent = `${scenarioRows.length} 条触发明细`;
+  renderScenarioDetails();
   els.status.textContent = `${acct.symbol} 已完成三种情形推演。`;
   saveState();
 }
@@ -683,6 +699,7 @@ function clearTrades() {
 }
 
 els.tabs.forEach((tab) => tab.addEventListener("click", () => switchWindow(tab.dataset.window)));
+els.scenarioTabs.forEach((tab) => tab.addEventListener("click", () => switchScenarioPane(tab.dataset.scenarioPane)));
 els.addGrid.addEventListener("click", () => addGrid());
 document.addEventListener("input", (event) => {
   if (event.target.matches("input, select")) scheduleSave();

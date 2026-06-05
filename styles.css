@@ -599,6 +599,86 @@ p {
   gap: 16px;
 }
 
+.scenario-switch {
+  position: sticky;
+  top: 62px;
+  z-index: 4;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.20);
+  border-radius: 8px;
+  background: rgba(3, 7, 18, 0.82);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-soft);
+}
+
+.scenario-tab {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: linear-gradient(180deg, #111c2e, #0c1422);
+  color: #d8e7f8;
+  box-shadow: none;
+  white-space: nowrap;
+}
+
+.scenario-tab.active {
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--hot-red), var(--hot-orange), var(--violet));
+  color: #fff;
+}
+
+.scenario-pane {
+  display: none;
+  flex-direction: column;
+  gap: 16px;
+}
+
+#scenarioWindow[data-scenario-pane="setup"] #scenarioSetupPane {
+  display: flex;
+}
+
+#scenarioWindow[data-scenario-pane="setup"] > .metrics,
+#scenarioWindow[data-scenario-pane="setup"] > .scenario-grid,
+#scenarioWindow[data-scenario-pane="setup"] > .scenario-detail {
+  display: none;
+}
+
+#scenarioWindow[data-scenario-pane="up"] .metrics .metric:nth-child(2),
+#scenarioWindow[data-scenario-pane="up"] .metrics .metric:nth-child(3),
+#scenarioWindow[data-scenario-pane="up"] .metrics .metric:nth-child(4),
+#scenarioWindow[data-scenario-pane="down"] .metrics .metric:nth-child(1),
+#scenarioWindow[data-scenario-pane="down"] .metrics .metric:nth-child(4),
+#scenarioWindow[data-scenario-pane="rebound"] .metrics .metric:nth-child(1),
+#scenarioWindow[data-scenario-pane="rebound"] .metrics .metric:nth-child(2),
+#scenarioWindow[data-scenario-pane="rebound"] .metrics .metric:nth-child(3) {
+  display: none;
+}
+
+#scenarioWindow[data-scenario-pane="up"] .scenario-grid .panel:nth-child(2),
+#scenarioWindow[data-scenario-pane="up"] .scenario-grid .panel:nth-child(3),
+#scenarioWindow[data-scenario-pane="down"] .scenario-grid .panel:nth-child(1),
+#scenarioWindow[data-scenario-pane="down"] .scenario-grid .panel:nth-child(3),
+#scenarioWindow[data-scenario-pane="rebound"] .scenario-grid .panel:nth-child(1),
+#scenarioWindow[data-scenario-pane="rebound"] .scenario-grid .panel:nth-child(2) {
+  display: none;
+}
+
+#scenarioWindow[data-scenario-pane="up"] .scenario-grid,
+#scenarioWindow[data-scenario-pane="down"] .scenario-grid,
+#scenarioWindow[data-scenario-pane="rebound"] .scenario-grid {
+  grid-template-columns: 1fr;
+}
+
+#scenarioWindow[data-scenario-pane="up"] .metrics,
+#scenarioWindow[data-scenario-pane="down"] .metrics,
+#scenarioWindow[data-scenario-pane="rebound"] .metrics {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
 .grid-cards {
   display: grid;
   gap: 12px;
@@ -1000,6 +1080,19 @@ tbody tr:hover {
   .match-grid,
   .scenario-grid {
     grid-template-columns: 1fr;
+  }
+
+  .scenario-switch {
+    top: 122px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .scenario-tab {
+    min-height: 38px;
+    padding: 0 8px;
+    font-size: 13px;
   }
 
   .metrics,
