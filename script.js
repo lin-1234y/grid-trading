@@ -417,7 +417,7 @@ function runScenarios() {
   els.upBox.innerHTML = boxRows([["到达价格", money(upper)], ["卖出现金", money(upCash)], ["剩余股数", `${qty(upShares)} 股`], ["剩余市值", money(upFinal)], ["总体收益", money(upProfit)]]);
   els.downBox.innerHTML = boxRows([["到达价格", money(lower)], ["总体补仓金额", money(downCash)], ["可用现金不足还需", money(Math.max(0, downCash - acct.cash))], ["最终股数", `${qty(downShares)} 股`], ["总体亏损", money(downLoss)]]);
   els.reboundBox.innerHTML = boxRows([["先跌到", money(lower)], ["再涨到", money(upper)], ["补仓金额", money(reboundBuy)], ["卖出现金", money(reboundSell)], ["总体盈利", money(reboundProfit)]]);
-  els.detailRows.innerHTML = scenarioRows.length ? scenarioRows.map((r, i) => `<tr>${cell("序号", i + 1)}${cell("情形", esc(r.scenario))}${cell("网格", esc(r.grid))}${cell("方向", esc(r.side))}${cell("触发价", money(r.price))}${cell("股数", qty(r.shares))}${cell("成交金额", money(r.amount))}${cell("费用", money(r.fee))}${cell("说明", esc(r.note || "-"))}</tr>`).join("") : `<tr><td colspan="9" class="empty">没有触发任何网格。</td></tr>`;
+  els.detailRows.innerHTML = scenarioRows.length ? scenarioRows.map((r, i) => `<tr>${cell("序号", i + 1)}${cell("情形", esc(r.scenario), "tag-cell")}${cell("网格", esc(r.grid), "tag-cell")}${cell("方向", esc(r.side))}${cell("触发价", money(r.price))}${cell("股数", qty(r.shares))}${cell("成交金额", money(r.amount))}${cell("费用", money(r.fee))}${cell("说明", esc(r.note || "-"))}</tr>`).join("") : `<tr><td colspan="9" class="empty">没有触发任何网格。</td></tr>`;
   els.detailSummary.textContent = `${scenarioRows.length} 条触发明细`;
   els.status.textContent = `${acct.symbol} 已完成三种情形推演。`;
   saveState();
@@ -483,9 +483,9 @@ function renderAllTrades(editId = "") {
   const sorted = [...visible].sort((a, b) => `${a.date}-${a.createdAt}`.localeCompare(`${b.date}-${b.createdAt}`));
   els.tradeFlowRows.innerHTML = sorted.length ? sorted.map((t, i) => {
     if (t.id === editId) {
-      return `<tr data-id="${t.id}" class="edit-row">${cell("序号", i + 1)}${cell("日期", `<input data-edit="date" type="date" value="${esc(t.date)}">`)}${cell("代码", `<input data-edit="symbol" value="${esc(t.symbol)}">`)}${cell("方向", `<select data-edit="side"><option value="buy"${t.side === "buy" ? " selected" : ""}>买入</option><option value="sell"${t.side === "sell" ? " selected" : ""}>卖出</option></select>`)}${cell("价格", `<input data-edit="price" type="number" step="0.001" value="${t.price}">`)}${cell("股数", `<input data-edit="shares" type="number" step="100" value="${t.shares}">`)}${cell("成交金额", money(t.amount))}${cell("费用", `<input data-edit="fee" type="number" step="0.01" value="${t.fee}">`)}${cell("操作", `<button data-action="save">保存</button><button data-action="cancel">取消</button>`, "action-cell")}</tr>`;
+      return `<tr data-id="${t.id}" class="edit-row">${cell("序号", i + 1)}${cell("日期", `<input data-edit="date" type="date" value="${esc(t.date)}">`)}${cell("代码", `<input data-edit="symbol" value="${esc(t.symbol)}">`, "symbol-cell")}${cell("方向", `<select data-edit="side"><option value="buy"${t.side === "buy" ? " selected" : ""}>买入</option><option value="sell"${t.side === "sell" ? " selected" : ""}>卖出</option></select>`)}${cell("价格", `<input data-edit="price" type="number" step="0.001" value="${t.price}">`)}${cell("股数", `<input data-edit="shares" type="number" step="100" value="${t.shares}">`)}${cell("成交金额", money(t.amount))}${cell("费用", `<input data-edit="fee" type="number" step="0.01" value="${t.fee}">`)}${cell("操作", `<button data-action="save">保存</button><button data-action="cancel">取消</button>`, "action-cell")}</tr>`;
     }
-    return `<tr data-id="${t.id}">${cell("序号", i + 1)}${cell("日期", esc(t.date))}${cell("代码", esc(t.symbol))}${cell("方向", t.side === "buy" ? "买入" : "卖出")}${cell("价格", money(t.price))}${cell("股数", qty(t.shares))}${cell("成交金额", money(t.amount))}${cell("费用", money(t.fee))}${cell("操作", `<button data-action="edit">编辑</button><button data-action="delete">删除</button>`, "action-cell")}</tr>`;
+    return `<tr data-id="${t.id}">${cell("序号", i + 1)}${cell("日期", esc(t.date))}${cell("代码", esc(t.symbol), "symbol-cell")}${cell("方向", t.side === "buy" ? "买入" : "卖出", "tag-cell")}${cell("价格", money(t.price))}${cell("股数", qty(t.shares))}${cell("成交金额", money(t.amount))}${cell("费用", money(t.fee))}${cell("操作", `<button data-action="edit">编辑</button><button data-action="delete">删除</button>`, "action-cell")}</tr>`;
   }).join("") : `<tr><td colspan="9" class="empty">${flowFilterSymbol ? `没有 ${esc(flowFilterSymbol)} 的交易流水。` : "还没有交易流水。"}</td></tr>`;
 }
 
@@ -513,7 +513,7 @@ function renderOverview() {
     };
   }).sort((a, b) => b.lastDate.localeCompare(a.lastDate) || a.symbol.localeCompare(b.symbol));
   els.overviewSummary.textContent = `${rows.length} 只股票`;
-  els.overviewRows.innerHTML = rows.length ? rows.map((r, i) => `<tr>${cell("序号", i + 1)}${cell("代码", esc(r.symbol))}${cell("交易次数", qty(r.count))}${cell("总成交金额", money(r.amount))}${cell("总费用", money(r.fee))}${cell("已匹配盈亏", money(r.profit), profitClass(r.profit))}${cell("未匹配买入", `${qty(r.openBuy)} 股`)}${cell("未匹配卖出", `${qty(r.openSell)} 股`)}${cell("最后交易日", esc(r.lastDate || "-"))}${cell("操作", `<button data-action="view-symbol" data-symbol="${esc(r.symbol)}">查看</button>`, "action-cell")}</tr>`).join("") : `<tr><td colspan="10" class="empty">还没有交易流水。</td></tr>`;
+  els.overviewRows.innerHTML = rows.length ? rows.map((r, i) => `<tr>${cell("序号", i + 1)}${cell("代码", esc(r.symbol), "symbol-cell")}${cell("交易次数", qty(r.count))}${cell("总成交金额", money(r.amount))}${cell("总费用", money(r.fee))}${cell("已匹配盈亏", money(r.profit), profitClass(r.profit))}${cell("未匹配买入", `${qty(r.openBuy)} 股`)}${cell("未匹配卖出", `${qty(r.openSell)} 股`)}${cell("最后交易日", esc(r.lastDate || "-"))}${cell("操作", `<button data-action="view-symbol" data-symbol="${esc(r.symbol)}">查看</button>`, "action-cell")}</tr>`).join("") : `<tr><td colspan="10" class="empty">还没有交易流水。</td></tr>`;
 }
 
 function editTradeFromRow(row) {
@@ -637,8 +637,8 @@ function renderQuery() {
   els.tOpenSellShares.textContent = `${qty(openSell)} 股`;
   els.matchedSummary.textContent = `${matched.length} 组匹配`;
   els.unmatchedSummary.textContent = `${unmatched.length} 条未匹配`;
-  els.matchedRows.innerHTML = matched.length ? matched.map((r, i) => `<tr>${cell("序号", i + 1)}${cell("代码", esc(r.symbol))}${cell("卖出日期", esc(r.sellDate))}${cell("卖价", money(r.sellPrice))}${cell("买入日期", esc(r.buyDate))}${cell("买价", money(r.buyPrice))}${cell("股数", qty(r.shares))}${cell("成交金额", money(r.amount))}${cell("费用", money(r.fee))}${cell("盈亏", money(r.profit), profitClass(r.profit))}</tr>`).join("") : `<tr><td colspan="10" class="empty">还没有可匹配的反向交易。</td></tr>`;
-  els.unmatchedRows.innerHTML = unmatched.length ? unmatched.map((r, i) => `<tr>${cell("序号", i + 1)}${cell("日期", esc(r.date))}${cell("代码", esc(r.symbol))}${cell("方向", r.side === "buy" ? "买入" : "卖出")}${cell("价格", money(r.price))}${cell("剩余股数", qty(r.remaining))}${cell("成交金额", money(r.remaining * r.price))}${cell("剩余费用", money(r.remainingFee))}</tr>`).join("") : `<tr><td colspan="8" class="empty">没有未匹配交易。</td></tr>`;
+  els.matchedRows.innerHTML = matched.length ? matched.map((r, i) => `<tr>${cell("序号", i + 1)}${cell("代码", esc(r.symbol), "symbol-cell")}${cell("卖出日期", esc(r.sellDate))}${cell("卖价", money(r.sellPrice))}${cell("买入日期", esc(r.buyDate))}${cell("买价", money(r.buyPrice))}${cell("股数", qty(r.shares))}${cell("成交金额", money(r.amount))}${cell("费用", money(r.fee))}${cell("盈亏", money(r.profit), profitClass(r.profit))}</tr>`).join("") : `<tr><td colspan="10" class="empty">还没有可匹配的反向交易。</td></tr>`;
+  els.unmatchedRows.innerHTML = unmatched.length ? unmatched.map((r, i) => `<tr>${cell("序号", i + 1)}${cell("日期", esc(r.date))}${cell("代码", esc(r.symbol), "symbol-cell")}${cell("方向", r.side === "buy" ? "买入" : "卖出", "tag-cell")}${cell("价格", money(r.price))}${cell("剩余股数", qty(r.remaining))}${cell("成交金额", money(r.remaining * r.price))}${cell("剩余费用", money(r.remainingFee))}</tr>`).join("") : `<tr><td colspan="8" class="empty">没有未匹配交易。</td></tr>`;
 }
 
 function exportBackup() {
