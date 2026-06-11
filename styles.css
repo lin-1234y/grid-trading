@@ -582,6 +582,7 @@ p {
   background: linear-gradient(135deg, rgba(17, 28, 46, 0.94), rgba(30, 41, 59, 0.86));
   color: #ff4f5e;
   font-family: var(--font-display);
+  font-size: 16px;
   font-weight: 900;
   text-shadow: 0 0 12px rgba(255, 79, 94, 0.34);
 }
@@ -753,6 +754,20 @@ p {
   padding: 14px;
 }
 
+#queryWindow .match-grid > .panel:first-child .table-wrap {
+  display: none;
+}
+
+.detail-open-button {
+  width: calc(100% - 28px);
+  margin: 14px;
+  background: linear-gradient(135deg, var(--hot-red), var(--hot-orange), var(--blue));
+}
+
+.detail-modal-card {
+  width: min(920px, 100%);
+}
+
 .t-form {
   display: grid;
   gap: 12px;
@@ -816,6 +831,29 @@ p {
   color: #adc1d8;
   font-size: 12px;
   font-weight: 800;
+}
+
+.all-profit-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 1px solid rgba(255, 209, 102, 0.22);
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(255, 48, 79, 0.12), rgba(255, 122, 24, 0.10), rgba(15, 23, 42, 0.88));
+}
+
+.all-profit-line span {
+  color: #adc1d8;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.all-profit-line strong {
+  font-family: var(--font-number);
+  font-size: 20px;
+  line-height: 1;
 }
 
 .symbol-chips {
@@ -1181,6 +1219,18 @@ tbody tr:hover {
   .symbol-cell,
   .tag-cell {
     padding: 3px 4px;
+  }
+
+  .symbol-cell {
+    font-size: 16px;
+    line-height: 1.12;
+  }
+
+  #tradeFlowRows .symbol-cell,
+  #matchedRows .symbol-cell,
+  #unmatchedRows .symbol-cell,
+  #overviewRows .symbol-cell {
+    font-size: 17px;
   }
 
   td[data-label="操作"] {

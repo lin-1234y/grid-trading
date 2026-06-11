@@ -45,6 +45,7 @@ const els = {
   tEndDate: document.querySelector("#tEndDateInput"),
   applyTradeFilter: document.querySelector("#applyTradeFilterButton"),
   currentQuerySymbol: document.querySelector("#currentQuerySymbol"),
+  allMatchedProfit: document.querySelector("#allMatchedProfit"),
   openQuerySymbolPicker: document.querySelector("#openQuerySymbolPicker"),
   symbolModal: document.querySelector("#symbolModal"),
   symbolModalTitle: document.querySelector("#symbolModalTitle"),
@@ -78,6 +79,37 @@ let saveTimer = 0;
 let flowFilterSymbol = "";
 let symbolPickerMode = "query";
 const STORAGE_KEY = "gridTradingToolState";
+
+function ensureMatchedDetailModal() {
+  const matchedPanel = document.querySelector("#matchedRows")?.closest(".panel");
+  if (matchedPanel && !document.querySelector("#openMatchedModal")) {
+    const button = document.createElement("button");
+    button.id = "openMatchedModal";
+    button.className = "detail-open-button";
+    button.type = "button";
+    button.textContent = "查看已匹配细节";
+    matchedPanel.appendChild(button);
+  }
+  if (!document.querySelector("#matchedModal")) {
+    document.body.insertAdjacentHTML("beforeend", `
+      <div id="matchedModal" class="modal" hidden>
+        <div class="modal-backdrop" data-close-matched-modal></div>
+        <section class="modal-card detail-modal-card" role="dialog" aria-modal="true" aria-labelledby="matchedModalTitle">
+          <div class="modal-title">
+            <h2 id="matchedModalTitle">已匹配细节</h2>
+            <button id="closeMatchedModal" class="icon-button" type="button">×</button>
+          </div>
+          <div class="table-wrap tall">
+            <table>
+              <thead><tr><th>序号</th><th>代码</th><th>卖出日期</th><th>卖价</th><th>买入日期</th><th>买价</th><th>股数</th><th>成交金额</th><th>费用</th><th>盈亏</th></tr></thead>
+              <tbody id="matchedModalRows"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    `);
+  }
+}
 
 function n(value, fallback = 0) {
   const parsed = Number.parseFloat(value);
@@ -637,6 +669,8 @@ function findOpposite(open, side) {
 function renderQuery() {
   renderSymbolChoices();
   const rows = filteredTrades();
+  const allMatched = matchTrades([...trades].sort((a, b) => `${a.date}-${a.createdAt}`.localeCompare(`${b.date}-${b.createdAt}`))).matched;
+  const allProfit = allMatched.reduce((sum, r) => sum + r.profit, 0);
   const { matched, unmatched } = matchTrades(rows);
   const profit = matched.reduce((sum, r) => sum + r.profit, 0);
   const totalFees = rows.reduce((sum, r) => sum + Number(r.fee || 0), 0);
@@ -644,6 +678,8 @@ function renderQuery() {
   const matchedShares = matched.reduce((sum, r) => sum + r.shares, 0);
   const openBuy = unmatched.filter((r) => r.side === "buy").reduce((sum, r) => sum + r.remaining, 0);
   const openSell = unmatched.filter((r) => r.side === "sell").reduce((sum, r) => sum + r.remaining, 0);
+  els.allMatchedProfit.textContent = money(allProfit);
+  els.allMatchedProfit.className = profitClass(allProfit);
   els.tMatchedProfit.textContent = money(profit);
   els.tMatchedProfit.className = profitClass(profit);
   els.tTotalFees.textContent = money(totalFees);
@@ -653,7 +689,10 @@ function renderQuery() {
   els.tOpenSellShares.textContent = `${qty(openSell)} 股`;
   els.matchedSummary.textContent = `${matched.length} 组匹配`;
   els.unmatchedSummary.textContent = `${unmatched.length} 条未匹配`;
-  els.matchedRows.innerHTML = matched.length ? matched.map((r, i) => `<tr>${cell("序号", i + 1, "seq-cell")}${cell("代码", esc(r.symbol), "symbol-cell")}${cell("卖出日期", esc(r.sellDate), "sell-date-cell")}${cell("卖价", money(r.sellPrice), "sell-price-cell")}${cell("买入日期", esc(r.buyDate), "buy-date-cell")}${cell("买价", money(r.buyPrice), "buy-price-cell")}${cell("股数", qty(r.shares), "shares-cell")}${cell("成交金额", money(r.amount), "amount-cell")}${cell("费用", money(r.fee), "fee-cell")}${cell("盈亏", money(r.profit), `${profitClass(r.profit)} profit-cell`)}</tr>`).join("") : `<tr><td colspan="10" class="empty">还没有可匹配的反向交易。</td></tr>`;
+  const matchedHtml = matched.length ? matched.map((r, i) => `<tr>${cell("序号", i + 1, "seq-cell")}${cell("代码", esc(r.symbol), "symbol-cell")}${cell("卖出日期", esc(r.sellDate), "sell-date-cell")}${cell("卖价", money(r.sellPrice), "sell-price-cell")}${cell("买入日期", esc(r.buyDate), "buy-date-cell")}${cell("买价", money(r.buyPrice), "buy-price-cell")}${cell("股数", qty(r.shares), "shares-cell")}${cell("成交金额", money(r.amount), "amount-cell")}${cell("费用", money(r.fee), "fee-cell")}${cell("盈亏", money(r.profit), `${profitClass(r.profit)} profit-cell`)}</tr>`).join("") : `<tr><td colspan="10" class="empty">还没有可匹配的反向交易。</td></tr>`;
+  els.matchedRows.innerHTML = matchedHtml;
+  const matchedModalRows = document.querySelector("#matchedModalRows");
+  if (matchedModalRows) matchedModalRows.innerHTML = matchedHtml;
   els.unmatchedRows.innerHTML = unmatched.length ? unmatched.map((r, i) => `<tr>${cell("序号", i + 1, "seq-cell")}${cell("日期", esc(r.date), "date-cell")}${cell("代码", esc(r.symbol), "symbol-cell")}${cell("方向", r.side === "buy" ? "买入" : "卖出", "tag-cell side-cell")}${cell("价格", money(r.price), "price-cell")}${cell("剩余股数", qty(r.remaining), "shares-cell")}${cell("成交金额", money(r.remaining * r.price), "amount-cell")}${cell("剩余费用", money(r.remainingFee), "fee-cell")}</tr>`).join("") : `<tr><td colspan="8" class="empty">没有未匹配交易。</td></tr>`;
 }
 
@@ -765,6 +804,14 @@ els.symbolModal.addEventListener("click", (event) => {
   closeSymbolModal();
   saveState();
 });
+document.addEventListener("click", (event) => {
+  if (event.target.closest("#openMatchedModal")) {
+    document.querySelector("#matchedModal").hidden = false;
+  }
+  if (event.target.closest("#closeMatchedModal") || event.target.matches("[data-close-matched-modal]")) {
+    document.querySelector("#matchedModal").hidden = true;
+  }
+});
 els.applyTradeFilter.addEventListener("click", () => {
   renderQuery();
   saveState();
@@ -774,6 +821,7 @@ els.importBackup.addEventListener("change", () => importBackup(els.importBackup.
 els.clearTrades.addEventListener("click", clearTrades);
 
 grids = defaultGrids();
+ensureMatchedDetailModal();
 loadTrades();
 restoreState();
 if (!els.tDate.value) els.tDate.value = todayIso();
