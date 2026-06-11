@@ -578,13 +578,13 @@ p {
 }
 
 .symbol-cell {
-  border: 1px solid rgba(255, 209, 102, 0.34);
-  background: linear-gradient(135deg, rgba(17, 28, 46, 0.94), rgba(30, 41, 59, 0.86));
-  color: #ff4f5e;
+  border: 1px solid rgba(255, 209, 102, 0.52);
+  background: linear-gradient(135deg, rgba(17, 28, 46, 0.94), rgba(45, 38, 20, 0.72));
+  color: #ffd700;
   font-family: var(--font-display);
   font-size: 16px;
   font-weight: 900;
-  text-shadow: 0 0 12px rgba(255, 79, 94, 0.34);
+  text-shadow: 0 0 6px rgba(255, 215, 0, 0.68), 0 0 16px rgba(255, 169, 32, 0.36);
 }
 
 .tag-cell {
