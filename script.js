@@ -46,6 +46,7 @@ const els = {
   tradeFlowRows: document.querySelector("#tradeFlowRows"),
   overviewRows: document.querySelector("#overviewRows"),
   overviewSummary: document.querySelector("#overviewSummary"),
+  overviewSort: document.querySelector("#overviewSortInput"),
   currentFlowSymbol: document.querySelector("#currentFlowSymbol"),
   openFlowSymbolPicker: document.querySelector("#openFlowSymbolPicker"),
   tFilterSymbol: document.querySelector("#tFilterSymbolInput"),
@@ -820,15 +821,17 @@ function renderAllTrades(editId = "") {
 }
 
 function renderOverview() {
+  const sortMode = els.overviewSort?.value || "lastDateDesc";
   const bySymbol = new Map();
   trades.forEach((trade) => {
     if (!trade.symbol) return;
     if (!bySymbol.has(trade.symbol)) {
-      bySymbol.set(trade.symbol, { symbol: trade.symbol, name: tradeName(trade), count: 0, amount: 0, fee: 0, lastDate: "", rows: [] });
+      bySymbol.set(trade.symbol, { symbol: trade.symbol, name: tradeName(trade), count: 0, volume: 0, amount: 0, fee: 0, lastDate: "", rows: [] });
     }
     const row = bySymbol.get(trade.symbol);
     if (!row.name && tradeName(trade)) row.name = tradeName(trade);
     row.count += 1;
+    row.volume += Number(trade.shares || 0);
     row.amount += Number(trade.amount || trade.price * trade.shares || 0);
     row.fee += Number(trade.fee || 0);
     row.lastDate = row.lastDate && row.lastDate > trade.date ? row.lastDate : trade.date;
@@ -842,9 +845,29 @@ function renderOverview() {
       openBuy: unmatched.filter((r) => r.side === "buy").reduce((sum, r) => sum + r.remaining, 0),
       openSell: unmatched.filter((r) => r.side === "sell").reduce((sum, r) => sum + r.remaining, 0),
     };
-  }).sort((a, b) => b.lastDate.localeCompare(a.lastDate) || a.symbol.localeCompare(b.symbol));
-  els.overviewSummary.textContent = `${rows.length} 只股票`;
-  els.overviewRows.innerHTML = rows.length ? rows.map((r, i) => `<tr>${cell("序号", i + 1)}${cell("代码/名称", symbolNameHtml(r.symbol, r.name), "symbol-cell")}${cell("交易次数", qty(r.count))}${cell("总成交金额", money(r.amount))}${cell("总费用", money(r.fee))}${cell("已匹配盈亏", money(r.profit), profitClass(r.profit))}${cell("未匹配买入", `${qty(r.openBuy)} 股`)}${cell("未匹配卖出", `${qty(r.openSell)} 股`)}${cell("最后交易日", esc(r.lastDate || "-"))}${cell("操作", `<button data-action="view-symbol" data-symbol="${esc(r.symbol)}">查看</button>`, "action-cell")}</tr>`).join("") : `<tr><td colspan="10" class="empty">还没有交易流水。</td></tr>`;
+  });
+  const numberSort = (field, direction = "desc") => (a, b) => {
+    const diff = Number(a[field] || 0) - Number(b[field] || 0);
+    return (direction === "asc" ? diff : -diff) || a.symbol.localeCompare(b.symbol);
+  };
+  const sorters = {
+    lastDateDesc: (a, b) => b.lastDate.localeCompare(a.lastDate) || a.symbol.localeCompare(b.symbol),
+    profitDesc: numberSort("profit", "desc"),
+    profitAsc: numberSort("profit", "asc"),
+    amountDesc: numberSort("amount", "desc"),
+    amountAsc: numberSort("amount", "asc"),
+    volumeDesc: numberSort("volume", "desc"),
+    volumeAsc: numberSort("volume", "asc"),
+    countDesc: numberSort("count", "desc"),
+    feeDesc: numberSort("fee", "desc"),
+    openBuyDesc: numberSort("openBuy", "desc"),
+    openSellDesc: numberSort("openSell", "desc"),
+    symbolAsc: (a, b) => a.symbol.localeCompare(b.symbol),
+  };
+  rows.sort(sorters[sortMode] || sorters.lastDateDesc);
+  const sortLabel = els.overviewSort?.selectedOptions?.[0]?.textContent || "最近交易";
+  els.overviewSummary.textContent = `${rows.length} 只股票 · ${sortLabel}`;
+  els.overviewRows.innerHTML = rows.length ? rows.map((r, i) => `<tr>${cell("序号", i + 1)}${cell("代码/名称", symbolNameHtml(r.symbol, r.name), "symbol-cell")}${cell("交易次数", qty(r.count))}${cell("成交股数", `${qty(r.volume)} 股`)}${cell("总成交金额", money(r.amount))}${cell("总费用", money(r.fee))}${cell("已匹配盈亏", money(r.profit), profitClass(r.profit))}${cell("未匹配买入", `${qty(r.openBuy)} 股`)}${cell("未匹配卖出", `${qty(r.openSell)} 股`)}${cell("最后交易日", esc(r.lastDate || "-"))}${cell("操作", `<button data-action="view-symbol" data-symbol="${esc(r.symbol)}">查看</button>`, "action-cell")}</tr>`).join("") : `<tr><td colspan="11" class="empty">还没有交易流水。</td></tr>`;
 }
 
 function editTradeFromRow(row) {
@@ -1078,6 +1101,13 @@ els.overviewRows.addEventListener("click", (event) => {
   renderQuery();
   switchWindow("queryWindow");
   saveState();
+});
+els.overviewSort?.addEventListener("change", renderOverview);
+document.querySelector("#overviewWindow thead")?.addEventListener("click", (event) => {
+  const header = event.target.closest("[data-overview-sort]");
+  if (!header || !els.overviewSort) return;
+  els.overviewSort.value = header.dataset.overviewSort || "lastDateDesc";
+  renderOverview();
 });
 els.openFlowSymbolPicker.addEventListener("click", () => openSymbolModal("flow"));
 els.openQuerySymbolPicker.addEventListener("click", () => openSymbolModal("query"));

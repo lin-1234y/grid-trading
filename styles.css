@@ -933,6 +933,28 @@ p {
   font-weight: 800;
 }
 
+.overview-sortbar {
+  margin: 10px 0 12px;
+}
+
+.compact-field {
+  max-width: 260px;
+  margin: 0;
+}
+
+.compact-field select {
+  min-height: 40px;
+  border-color: rgba(255, 209, 102, 0.5);
+  background: #fff7df;
+  color: #172033;
+  font-weight: 800;
+}
+
+.compact-field select option {
+  background: #fffdf5;
+  color: #172033;
+}
+
 .symbol-chip {
   width: auto;
   min-height: 34px;
@@ -1018,6 +1040,31 @@ p {
   gap: 12px;
 }
 
+#symbolModal {
+  place-items: start center;
+  overflow: hidden;
+  padding-top: max(12px, env(safe-area-inset-top));
+}
+
+#symbolModal .modal-card {
+  display: flex;
+  flex-direction: column;
+  width: min(560px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px);
+  max-height: calc(100dvh - 24px);
+  overflow: hidden;
+}
+
+#symbolModal .modal-title {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  flex: 0 0 auto;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  background: linear-gradient(180deg, #111c2e, #0d1626);
+}
+
 .icon-button {
   width: 40px;
   min-height: 40px;
@@ -1035,6 +1082,14 @@ p {
   gap: 8px;
   overflow: auto;
   padding-right: 2px;
+  -webkit-overflow-scrolling: touch;
+}
+
+#symbolModalChoices {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: calc(100vh - 108px);
+  max-height: calc(100dvh - 108px);
 }
 
 .symbol-grid .symbol-chip {
@@ -1183,6 +1238,22 @@ tbody tr:hover {
 
   .modal-card {
     max-height: 82vh;
+  }
+
+  #symbolModal {
+    place-items: start center;
+    padding: max(8px, env(safe-area-inset-top)) 8px 8px;
+  }
+
+  #symbolModal .modal-card {
+    width: 100%;
+    max-height: calc(100vh - 16px);
+    max-height: calc(100dvh - 16px);
+  }
+
+  #symbolModalChoices {
+    max-height: calc(100vh - 98px);
+    max-height: calc(100dvh - 98px);
   }
 
   #matchedModal {

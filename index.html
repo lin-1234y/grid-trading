@@ -158,9 +158,27 @@
       <section id="overviewWindow" class="tool-window">
         <section class="panel">
           <div class="panel-title"><h2>个股总览</h2><span id="overviewSummary">-</span></div>
+          <div class="overview-sortbar">
+            <label class="field compact-field"><span>总体排序</span>
+              <select id="overviewSortInput">
+                <option value="lastDateDesc">最近交易</option>
+                <option value="profitDesc">匹配盈亏最多</option>
+                <option value="profitAsc">匹配盈亏最少</option>
+                <option value="amountDesc">成交金额最多</option>
+                <option value="amountAsc">成交金额最少</option>
+                <option value="volumeDesc">成交股数最多</option>
+                <option value="volumeAsc">成交股数最少</option>
+                <option value="countDesc">交易次数最多</option>
+                <option value="feeDesc">费用最多</option>
+                <option value="openBuyDesc">未匹配买入最多</option>
+                <option value="openSellDesc">未匹配卖出最多</option>
+                <option value="symbolAsc">代码从小到大</option>
+              </select>
+            </label>
+          </div>
           <div class="table-wrap tall">
             <table>
-              <thead><tr><th>序号</th><th>代码/名称</th><th>交易次数</th><th>总成交金额</th><th>总费用</th><th>已匹配盈亏</th><th>未匹配买入</th><th>未匹配卖出</th><th>最后交易日</th><th>操作</th></tr></thead>
+              <thead><tr><th>序号</th><th data-overview-sort="symbolAsc">代码/名称</th><th data-overview-sort="countDesc">交易次数</th><th data-overview-sort="volumeDesc">成交股数</th><th data-overview-sort="amountDesc">总成交金额</th><th data-overview-sort="feeDesc">总费用</th><th data-overview-sort="profitDesc">已匹配盈亏</th><th data-overview-sort="openBuyDesc">未匹配买入</th><th data-overview-sort="openSellDesc">未匹配卖出</th><th data-overview-sort="lastDateDesc">最后交易日</th><th>操作</th></tr></thead>
               <tbody id="overviewRows"></tbody>
             </table>
           </div>
