@@ -812,6 +812,63 @@ p {
   display: none;
 }
 
+.broker-status {
+  margin: 0 14px 14px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.broker-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 0 14px 14px;
+}
+
+.broker-stat {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.broker-stat span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.broker-stat strong {
+  display: block;
+  margin-top: 5px;
+  color: var(--gold);
+  font-size: 18px;
+}
+
+.broker-preview {
+  padding: 0 14px;
+}
+
+.symbol-code {
+  display: block;
+  color: #ffd166;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
+.symbol-name {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.symbol-cell input + input {
+  margin-top: 6px;
+}
+
 .symbol-filter {
   display: grid;
   gap: 8px;
