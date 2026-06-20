@@ -10,8 +10,8 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>网格交易工具</title>
     <link rel="manifest" href="manifest.webmanifest">
-    <link rel="icon" href="icon.svg" type="image/svg+xml">
-    <link rel="apple-touch-icon" href="icon.svg">
+    <link rel="icon" href="icon-192.png" type="image/png">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
@@ -158,27 +158,26 @@
       <section id="overviewWindow" class="tool-window">
         <section class="panel">
           <div class="panel-title"><h2>个股总览</h2><span id="overviewSummary">-</span></div>
+          <div id="overviewStats" class="overview-stats"></div>
           <div class="overview-sortbar">
             <label class="field compact-field"><span>总体排序</span>
               <select id="overviewSortInput">
+                <option value="totalProfitDesc">总盈亏最多</option>
+                <option value="totalProfitAsc">总盈亏最少</option>
+                <option value="statusOpen">持仓优先</option>
+                <option value="statusCleared">清仓优先</option>
                 <option value="lastDateDesc">最近交易</option>
-                <option value="profitDesc">匹配盈亏最多</option>
-                <option value="profitAsc">匹配盈亏最少</option>
-                <option value="amountDesc">成交金额最多</option>
-                <option value="amountAsc">成交金额最少</option>
-                <option value="volumeDesc">成交股数最多</option>
-                <option value="volumeAsc">成交股数最少</option>
-                <option value="countDesc">交易次数最多</option>
-                <option value="feeDesc">费用最多</option>
                 <option value="openBuyDesc">未匹配买入最多</option>
                 <option value="openSellDesc">未匹配卖出最多</option>
+                <option value="amountDesc">成交金额最多</option>
+                <option value="feeDesc">费用最多</option>
                 <option value="symbolAsc">代码从小到大</option>
               </select>
             </label>
           </div>
           <div class="table-wrap tall">
             <table>
-              <thead><tr><th>序号</th><th data-overview-sort="symbolAsc">代码/名称</th><th data-overview-sort="countDesc">交易次数</th><th data-overview-sort="volumeDesc">成交股数</th><th data-overview-sort="amountDesc">总成交金额</th><th data-overview-sort="feeDesc">总费用</th><th data-overview-sort="profitDesc">已匹配盈亏</th><th data-overview-sort="openBuyDesc">未匹配买入</th><th data-overview-sort="openSellDesc">未匹配卖出</th><th data-overview-sort="lastDateDesc">最后交易日</th><th>操作</th></tr></thead>
+              <thead><tr><th data-overview-sort="symbolAsc">代码/名称</th><th data-overview-sort="statusOpen">状态</th><th data-overview-sort="totalProfitDesc">总盈亏</th><th data-overview-sort="profitDesc">已匹配</th><th>估算持仓</th><th data-overview-sort="openBuyDesc">未匹配买入</th><th data-overview-sort="openSellDesc">未匹配卖出</th><th data-overview-sort="amountDesc">总成交额</th><th>操作</th></tr></thead>
               <tbody id="overviewRows"></tbody>
             </table>
           </div>
@@ -192,7 +191,42 @@
             <label class="field"><span>佣金率 %</span><input id="tCommissionPctInput" type="number" step="0.001" value="0.025"></label>
             <label class="field"><span>最低佣金</span><input id="tMinCommissionInput" type="number" step="0.01" value="5"></label>
             <label class="field"><span>卖出印花税 %</span><input id="tStampDutyPctInput" type="number" step="0.001" value="0.05"></label>
+            <label class="field checkbox-field">
+              <span>ETF 免印花税</span>
+              <label class="checkline"><input id="etfStampDutyExemptInput" type="checkbox" checked> 卖出 ETF 不收印花税</label>
+            </label>
           </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-title"><h2>原始持仓</h2><span>用于判断个股是否已经清仓</span></div>
+          <div class="form-grid">
+            <label class="field"><span>股票代码</span><input id="positionSymbolInput" placeholder="例如 600033"></label>
+            <label class="field"><span>股票名称</span><input id="positionNameInput" placeholder="可不填，自动识别"></label>
+            <label class="field"><span>原始股数</span><input id="positionSharesInput" type="number" step="100" min="0" placeholder="例如 10000"></label>
+            <label class="field"><span>原始成本价</span><input id="positionCostInput" type="number" step="0.001" min="0" placeholder="例如 4.20"></label>
+          </div>
+          <div class="actions">
+            <button id="savePositionButton" type="button">保存原始持仓</button>
+          </div>
+          <div id="positionList" class="position-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-title"><h2>分红送股</h2><span>权益发生后自动调整未匹配价格</span></div>
+          <div class="form-grid">
+            <label class="field"><span>日期</span><input id="equityDateInput" type="date"></label>
+            <label class="field"><span>股票代码</span><input id="equitySymbolInput" placeholder="例如 510300"></label>
+            <label class="field"><span>股票名称</span><input id="equityNameInput" placeholder="可不填，自动识别"></label>
+            <label class="field"><span>每股现金分红</span><input id="equityCashInput" type="number" step="0.001" min="0" placeholder="例如 0.08"></label>
+            <label class="field"><span>每 10 股送转</span><input id="equityBonusInput" type="number" step="0.1" min="0" placeholder="例如 3"></label>
+            <label class="field"><span>备注</span><input id="equityNoteInput" placeholder="例如 2026 年度分红"></label>
+          </div>
+          <div class="actions">
+            <button id="saveEquityButton" type="button">保存分红送股</button>
+          </div>
+          <p class="broker-status">规则：权益日之前尚未匹配的买入/卖出，价格按“(原价 - 每股分红) / (1 + 每10股送转/10)”调整；送转同时调整未匹配股数。</p>
+          <div id="equityList" class="position-list equity-list"></div>
         </section>
 
         <section class="panel">
@@ -209,14 +243,13 @@
       </section>
 
       <section id="queryWindow" class="tool-window">
-        <section class="panel">
+        <section class="panel compact-query-panel">
           <div class="panel-title"><h2>查询个股细节</h2><span>按代码和日期阶段查询</span></div>
-          <div class="form-grid">
+          <div class="form-grid query-date-grid">
             <input id="tFilterSymbolInput" type="hidden">
             <label class="field"><span>开始日期</span><input id="tStartDateInput" type="date"></label>
             <label class="field"><span>结束日期</span><input id="tEndDateInput" type="date"></label>
           </div>
-          <button id="applyTradeFilterButton" type="button">查询个股细节</button>
           <div class="symbol-filter">
             <div class="quick-title">查询股票</div>
             <div class="all-profit-line">
@@ -233,8 +266,11 @@
         <section class="metrics">
           <article class="metric profit-metric"><span>已匹配盈亏</span><strong id="tMatchedProfit">-</strong><em>总交易费用 <b id="tTotalFees">-</b></em><em>总成交金额 <b id="tTotalAmount">-</b></em></article>
           <article class="metric"><span>已匹配股数</span><strong id="tMatchedShares">-</strong></article>
-          <article class="metric"><span>未匹配买入</span><strong id="tOpenBuyShares">-</strong></article>
-          <article class="metric"><span>未匹配卖出</span><strong id="tOpenSellShares">-</strong></article>
+          <article class="metric position-metric"><span>未匹配买入</span><strong id="tOpenBuyShares">-</strong><em>均价 <b id="tOpenBuyAvg">-</b></em></article>
+          <article class="metric position-metric"><span>未匹配卖出</span><strong id="tOpenSellShares">-</strong><em>均价 <b id="tOpenSellAvg">-</b></em></article>
+          <article class="metric position-metric"><span>估算持仓</span><strong id="tEstimatedShares">-</strong><em id="tPositionStatus">选择股票后判断</em></article>
+          <article class="metric position-metric"><span>清仓匹配盈亏</span><strong id="tClearanceProfit">-</strong><em id="tClearanceHint">持仓为 0 时计算</em></article>
+          <article class="metric position-metric"><span>总盈亏</span><strong id="tFinalProfit">-</strong><em id="tFinalProfitHint">已匹配盈亏 + 清仓匹配盈亏</em></article>
         </section>
 
         <section class="match-grid">
@@ -242,7 +278,7 @@
             <div class="panel-title"><h3>已匹配细节</h3><span id="matchedSummary">-</span></div>
             <div class="table-wrap tall">
               <table>
-                <thead><tr><th>序号</th><th>代码/名称</th><th>卖出日期</th><th>卖价</th><th>买入日期</th><th>买价</th><th>股数</th><th>成交金额</th><th>费用</th><th>盈亏</th></tr></thead>
+                <thead><tr><th>阶段/卖出日期</th><th>卖价</th><th>买入日期</th><th>买价</th><th>股数</th><th>成交金额</th><th>费用</th><th>盈亏</th></tr></thead>
                 <tbody id="matchedRows"></tbody>
               </table>
             </div>

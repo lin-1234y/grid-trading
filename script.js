@@ -34,6 +34,21 @@ const els = {
   tCommissionPct: document.querySelector("#tCommissionPctInput"),
   tMinCommission: document.querySelector("#tMinCommissionInput"),
   tStampDutyPct: document.querySelector("#tStampDutyPctInput"),
+  etfStampDutyExempt: document.querySelector("#etfStampDutyExemptInput"),
+  positionSymbol: document.querySelector("#positionSymbolInput"),
+  positionName: document.querySelector("#positionNameInput"),
+  positionShares: document.querySelector("#positionSharesInput"),
+  positionCost: document.querySelector("#positionCostInput"),
+  savePosition: document.querySelector("#savePositionButton"),
+  positionList: document.querySelector("#positionList"),
+  equityDate: document.querySelector("#equityDateInput"),
+  equitySymbol: document.querySelector("#equitySymbolInput"),
+  equityName: document.querySelector("#equityNameInput"),
+  equityCash: document.querySelector("#equityCashInput"),
+  equityBonus: document.querySelector("#equityBonusInput"),
+  equityNote: document.querySelector("#equityNoteInput"),
+  saveEquity: document.querySelector("#saveEquityButton"),
+  equityList: document.querySelector("#equityList"),
   addTrade: document.querySelector("#addTradeButton"),
   brokerImportMode: document.querySelector("#brokerImportMode"),
   brokerImportFile: document.querySelector("#brokerImportFile"),
@@ -46,6 +61,7 @@ const els = {
   tradeFlowRows: document.querySelector("#tradeFlowRows"),
   overviewRows: document.querySelector("#overviewRows"),
   overviewSummary: document.querySelector("#overviewSummary"),
+  overviewStats: document.querySelector("#overviewStats"),
   overviewSort: document.querySelector("#overviewSortInput"),
   currentFlowSymbol: document.querySelector("#currentFlowSymbol"),
   openFlowSymbolPicker: document.querySelector("#openFlowSymbolPicker"),
@@ -69,7 +85,15 @@ const els = {
   tTotalAmount: document.querySelector("#tTotalAmount"),
   tMatchedShares: document.querySelector("#tMatchedShares"),
   tOpenBuyShares: document.querySelector("#tOpenBuyShares"),
+  tOpenBuyAvg: document.querySelector("#tOpenBuyAvg"),
   tOpenSellShares: document.querySelector("#tOpenSellShares"),
+  tOpenSellAvg: document.querySelector("#tOpenSellAvg"),
+  tEstimatedShares: document.querySelector("#tEstimatedShares"),
+  tPositionStatus: document.querySelector("#tPositionStatus"),
+  tClearanceProfit: document.querySelector("#tClearanceProfit"),
+  tClearanceHint: document.querySelector("#tClearanceHint"),
+  tFinalProfit: document.querySelector("#tFinalProfit"),
+  tFinalProfitHint: document.querySelector("#tFinalProfitHint"),
   backupName: document.querySelector("#backupNameInput"),
   exportBackup: document.querySelector("#exportBackupButton"),
   importBackup: document.querySelector("#importBackupInput"),
@@ -85,6 +109,11 @@ let grids = [];
 let scenarioRows = [];
 let trades = [];
 let pendingBrokerTrades = [];
+let originalPositions = {};
+let equityEvents = [];
+let matchedCalendarRows = [];
+let matchedCalendarMonth = "";
+let matchedCalendarSelected = "";
 let saveTimer = 0;
 let flowFilterSymbol = "";
 let symbolPickerMode = "query";
@@ -127,9 +156,24 @@ function ensureMatchedDetailModal() {
             <h2 id="matchedModalTitle">已匹配细节</h2>
             <button id="closeMatchedModal" class="icon-button" type="button">×</button>
           </div>
-          <div class="table-wrap tall">
+          <div class="matched-calendar-shell">
+            <div class="calendar-toolbar">
+              <button id="matchedCalendarPrev" type="button">上月</button>
+              <strong id="matchedCalendarTitle">-</strong>
+              <button id="matchedCalendarNext" type="button">下月</button>
+            </div>
+            <div class="calendar-weekdays">
+              <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+            </div>
+            <div id="matchedCalendarGrid" class="matched-calendar-grid"></div>
+            <div class="calendar-total-grid">
+              <article><span>本月匹配盈亏</span><strong id="matchedMonthProfit">-</strong><em>成交金额 <b id="matchedMonthAmount">-</b></em></article>
+              <article><span>本年匹配盈亏</span><strong id="matchedYearProfit">-</strong><em>成交金额 <b id="matchedYearAmount">-</b></em></article>
+            </div>
+          </div>
+          <div class="table-wrap tall daily-match-detail">
             <table>
-              <thead><tr><th>序号</th><th>代码</th><th>卖出日期</th><th>卖价</th><th>买入日期</th><th>买价</th><th>股数</th><th>成交金额</th><th>费用</th><th>盈亏</th></tr></thead>
+              <thead><tr><th>卖出日期</th><th>卖价</th><th>买入日期</th><th>买价</th><th>股数</th><th>成交金额</th><th>费用</th><th>盈亏</th></tr></thead>
               <tbody id="matchedModalRows"></tbody>
             </table>
           </div>
@@ -163,6 +207,15 @@ function qty(value) {
 
 function fixed(value) {
   return Number(value || 0).toFixed(4);
+}
+
+function priceText(value) {
+  return Number(value || 0).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 3 });
+}
+
+function signedPriceText(value) {
+  const number = Number(value || 0);
+  return `${number > 0 ? "+" : ""}${priceText(number)}`;
 }
 
 function esc(value) {
@@ -225,6 +278,7 @@ function account() {
     commissionPct: Math.max(0, n(els.tCommissionPct.value) / 100),
     minCommission: Math.max(0, n(els.tMinCommission.value)),
     stampDutyPct: Math.max(0, n(els.tStampDutyPct.value) / 100),
+    etfStampDutyExempt: Boolean(els.etfStampDutyExempt?.checked),
   };
 }
 
@@ -267,6 +321,7 @@ function collectState() {
       commissionPct: els.tCommissionPct.value,
       minCommission: els.tMinCommission.value,
       stampDutyPct: els.tStampDutyPct.value,
+      etfStampDutyExempt: Boolean(els.etfStampDutyExempt?.checked),
       backupName: els.backupName.value,
     },
     query: {
@@ -277,6 +332,8 @@ function collectState() {
     flow: {
       symbol: flowFilterSymbol,
     },
+    originalPositions,
+    equityEvents,
     trades,
   };
 }
@@ -322,6 +379,7 @@ function restoreState() {
   if (settings.commissionPct !== undefined) els.tCommissionPct.value = settings.commissionPct;
   if (settings.minCommission !== undefined) els.tMinCommission.value = settings.minCommission;
   if (settings.stampDutyPct !== undefined) els.tStampDutyPct.value = settings.stampDutyPct;
+  if (settings.etfStampDutyExempt !== undefined && els.etfStampDutyExempt) els.etfStampDutyExempt.checked = Boolean(settings.etfStampDutyExempt);
   if (settings.backupName !== undefined) els.backupName.value = settings.backupName;
   const query = state.query || {};
   if (query.symbol !== undefined) els.tFilterSymbol.value = query.symbol;
@@ -329,6 +387,8 @@ function restoreState() {
   if (query.endDate !== undefined) els.tEndDate.value = query.endDate;
   const flow = state.flow || {};
   if (flow.symbol !== undefined) flowFilterSymbol = flow.symbol;
+  originalPositions = state.originalPositions && typeof state.originalPositions === "object" ? state.originalPositions : {};
+  equityEvents = Array.isArray(state.equityEvents) ? state.equityEvents : [];
   if (Array.isArray(state.trades)) trades = state.trades;
   if (state.activeWindow) switchWindow(state.activeWindow, false);
 }
@@ -372,10 +432,17 @@ function roundLot(shares, lotSize) {
   return Math.floor(Math.max(0, shares) / lotSize) * lotSize;
 }
 
-function tradeFee(side, amount, acct = account()) {
+function isEtfTrade(symbol = "", name = "") {
+  const code = String(symbol || "").trim().toUpperCase();
+  const text = String(name || "").trim().toUpperCase();
+  return text.includes("ETF") || /^(15|16|51|52|56|58)\d{4}$/.test(code);
+}
+
+function tradeFee(side, amount, acct = account(), symbol = acct.symbol, name = "") {
   if (amount <= 0) return 0;
   const commission = Math.max(acct.minCommission, amount * acct.commissionPct);
-  const stamp = side === "sell" ? amount * acct.stampDutyPct : 0;
+  const exemptStamp = acct.etfStampDutyExempt && side === "sell" && isEtfTrade(symbol, name);
+  const stamp = side === "sell" && !exemptStamp ? amount * acct.stampDutyPct : 0;
   return commission + stamp;
 }
 
@@ -530,6 +597,7 @@ function nameFromTradeNote(note = "") {
 function stockNameForSymbol(symbol) {
   const code = String(symbol || "").trim().toUpperCase();
   if (!code) return "";
+  if (originalPositions[code]?.name) return originalPositions[code].name;
   const knownTrade = [...trades].reverse().find((trade) => trade.symbol === code && (trade.name || nameFromTradeNote(trade.note)));
   if (knownTrade) return knownTrade.name || nameFromTradeNote(knownTrade.note);
   return STOCK_NAME_MAP[code] || "";
@@ -551,6 +619,234 @@ function symbolNameHtml(symbol, name = "") {
   const cleanSymbol = String(symbol || "").trim().toUpperCase();
   const cleanName = name || stockNameForSymbol(cleanSymbol);
   return `<strong class="symbol-code">${esc(cleanSymbol)}</strong>${cleanName ? `<small class="symbol-name">${esc(cleanName)}</small>` : ""}`;
+}
+
+function normalizeSymbol(value) {
+  return String(value || "").trim().toUpperCase();
+}
+
+function saveOriginalPosition() {
+  const symbol = normalizeSymbol(els.positionSymbol.value);
+  if (!symbol) {
+    els.status.textContent = "请先填写股票代码。";
+    return;
+  }
+  const shares = Math.max(0, Math.floor(n(els.positionShares.value)));
+  const cost = Math.max(0, n(els.positionCost.value));
+  const name = els.positionName.value.trim() || stockNameForSymbol(symbol);
+  originalPositions[symbol] = { symbol, name, shares, cost };
+  els.positionSymbol.value = "";
+  els.positionName.value = "";
+  els.positionShares.value = "";
+  els.positionCost.value = "";
+  renderOriginalPositions();
+  renderSymbolChoices();
+  renderQuery();
+  saveState();
+  els.status.textContent = `已保存 ${symbol}${name ? ` ${name}` : ""} 的原始持仓。`;
+}
+
+function renderOriginalPositions() {
+  const positions = Object.values(originalPositions).sort((a, b) => a.symbol.localeCompare(b.symbol));
+  if (!positions.length) {
+    els.positionList.innerHTML = `<div class="empty position-empty">还没有保存原始持仓。</div>`;
+    return;
+  }
+  els.positionList.innerHTML = positions.map((pos) => `
+    <article class="position-row" data-symbol="${esc(pos.symbol)}">
+      <div class="position-main">${symbolNameHtml(pos.symbol, pos.name)}</div>
+      <div class="position-meta">
+        <span>原始股数 <b>${qty(pos.shares)} 股</b></span>
+        <span>成本 <b>${money(pos.cost)}</b></span>
+      </div>
+      <div class="position-actions">
+        <button type="button" data-action="load-position">载入</button>
+        <button type="button" data-action="delete-position">删除</button>
+      </div>
+    </article>
+  `).join("");
+}
+
+function loadOriginalPosition(symbol) {
+  const pos = originalPositions[symbol];
+  if (!pos) return;
+  els.positionSymbol.value = pos.symbol;
+  els.positionName.value = pos.name || "";
+  els.positionShares.value = pos.shares || "";
+  els.positionCost.value = pos.cost || "";
+}
+
+function autofillPositionName() {
+  if (els.positionName.value.trim()) return;
+  const name = stockNameForSymbol(normalizeSymbol(els.positionSymbol.value));
+  if (name) els.positionName.value = name;
+}
+
+function deleteOriginalPosition(symbol) {
+  delete originalPositions[symbol];
+  renderOriginalPositions();
+  renderQuery();
+  saveState();
+}
+
+function equityEventSort(a, b) {
+  return `${a.date}-${a.createdAt || 0}`.localeCompare(`${b.date}-${b.createdAt || 0}`);
+}
+
+function equityEventsForSymbol(symbol, throughDate = "") {
+  const code = normalizeSymbol(symbol);
+  return equityEvents
+    .filter((event) => event.symbol === code && (!throughDate || event.date <= throughDate))
+    .sort(equityEventSort);
+}
+
+function adjustedPriceForEquity(price, event) {
+  const cash = Math.max(0, Number(event.cash || 0));
+  const factor = 1 + (Math.max(0, Number(event.bonusPer10 || 0)) / 10);
+  return Math.max(0, (Number(price || 0) - cash) / factor);
+}
+
+function adjustedSharesForEquity(shares, event) {
+  const factor = 1 + (Math.max(0, Number(event.bonusPer10 || 0)) / 10);
+  return Math.max(0, Math.round(Number(shares || 0) * factor));
+}
+
+function applyEquityEventToOpen(open, event) {
+  open.forEach((item) => {
+    item.price = adjustedPriceForEquity(item.price, event);
+    item.remaining = adjustedSharesForEquity(item.remaining, event);
+    item.shares = adjustedSharesForEquity(item.shares, event);
+    item.amount = item.price * item.shares;
+    item.equityAdjusted = true;
+  });
+}
+
+function adjustedOriginalPosition(symbol, throughDate = todayIso()) {
+  const code = normalizeSymbol(symbol);
+  const pos = originalPositions[code];
+  if (!pos) return { symbol: code, name: stockNameForSymbol(code), shares: 0, cost: 0, hasPosition: false };
+  return equityEventsForSymbol(code, throughDate).reduce((current, event) => ({
+    ...current,
+    shares: adjustedSharesForEquity(current.shares, event),
+    cost: adjustedPriceForEquity(current.cost, event),
+  }), { ...pos, hasPosition: true });
+}
+
+function saveEquityEvent() {
+  const symbol = normalizeSymbol(els.equitySymbol.value);
+  const date = els.equityDate.value || todayIso();
+  const cash = Math.max(0, n(els.equityCash.value));
+  const bonusPer10 = Math.max(0, n(els.equityBonus.value));
+  if (!symbol || (!cash && !bonusPer10)) {
+    els.status.textContent = "请填写股票代码，并至少填写现金分红或送转数量。";
+    return;
+  }
+  const name = els.equityName.value.trim() || stockNameForSymbol(symbol);
+  equityEvents.push({ id: uid(), date, symbol, name, cash, bonusPer10, note: els.equityNote.value.trim(), createdAt: Date.now() });
+  els.equityCash.value = "";
+  els.equityBonus.value = "";
+  els.equityNote.value = "";
+  renderEquityEvents();
+  renderOverview();
+  renderQuery();
+  saveState();
+  els.status.textContent = `已保存 ${symbol}${name ? ` ${name}` : ""} 的分红送股规则。`;
+}
+
+function renderEquityEvents() {
+  const rows = [...equityEvents].sort((a, b) => equityEventSort(b, a));
+  if (!rows.length) {
+    els.equityList.innerHTML = `<div class="empty position-empty">还没有分红送股记录。</div>`;
+    return;
+  }
+  els.equityList.innerHTML = rows.map((event) => `
+    <article class="position-row equity-row" data-id="${esc(event.id)}">
+      <div class="position-main">${symbolNameHtml(event.symbol, event.name)}</div>
+      <div class="position-meta">
+        <span>日期 <b>${esc(event.date)}</b></span>
+        <span>现金 <b>${priceText(event.cash || 0)}</b></span>
+        <span>送转 <b>10 股送转 ${priceText(event.bonusPer10 || 0)}</b></span>
+        ${event.note ? `<span>备注 <b>${esc(event.note)}</b></span>` : ""}
+      </div>
+      <div class="position-actions">
+        <button type="button" data-action="delete-equity">删除</button>
+      </div>
+    </article>
+  `).join("");
+}
+
+function autofillEquityName() {
+  if (els.equityName.value.trim()) return;
+  const name = stockNameForSymbol(normalizeSymbol(els.equitySymbol.value));
+  if (name) els.equityName.value = name;
+}
+
+function deleteEquityEvent(id) {
+  equityEvents = equityEvents.filter((event) => event.id !== id);
+  renderEquityEvents();
+  renderOverview();
+  renderQuery();
+  saveState();
+}
+
+function renderPositionEstimate(activeSymbol, openBuy, openSell, matchedProfit = 0, totalBuyAmount = 0, totalSellAmount = 0) {
+  if (!activeSymbol) {
+    els.tEstimatedShares.textContent = "-";
+    els.tPositionStatus.textContent = "选择股票后判断";
+    els.tEstimatedShares.className = "";
+    return null;
+  }
+  const pos = adjustedOriginalPosition(activeSymbol, els.tEndDate.value || todayIso());
+  const baseShares = Number(pos?.shares || 0);
+  const estimated = baseShares + openBuy - openSell;
+  const isCleared = pos.hasPosition ? (openSell === baseShares && openBuy === 0) : estimated === 0;
+  const absShares = `${estimated < 0 ? "-" : ""}${qty(Math.abs(estimated))} 股`;
+  els.tEstimatedShares.textContent = absShares;
+  els.tEstimatedShares.className = estimated === 0 ? "profit-flat" : estimated > 0 ? "profit-positive" : "profit-negative";
+  const hasKnownCost = pos.hasPosition && Number(pos.cost || 0) > 0;
+  const currentCost = hasKnownCost && estimated > 0 ? ((pos.cost * baseShares) + totalBuyAmount - totalSellAmount) / estimated : null;
+  const costChange = currentCost !== null ? currentCost - pos.cost : (estimated > 0 ? -matchedProfit / estimated : null);
+  if (isCleared) {
+    els.tPositionStatus.textContent = hasKnownCost ? `已清仓 · 底仓成本 ${priceText(pos.cost)} · 变化 ${signedPriceText(costChange)}/股` : "已清仓 · 无底仓成本";
+  } else if (estimated > 0) {
+    if (currentCost !== null) {
+      els.tPositionStatus.textContent = `现在成本 ${priceText(currentCost)} · 变化 ${signedPriceText(costChange)}/股`;
+    } else {
+      els.tPositionStatus.textContent = `成本变化 ${signedPriceText(costChange)}/股 · -已匹配盈亏/现在股数`;
+    }
+  } else {
+    els.tPositionStatus.textContent = hasKnownCost ? `净卖出 ${qty(Math.abs(estimated))} 股 · 底仓成本 ${priceText(pos.cost)}` : `净卖出 ${qty(Math.abs(estimated))} 股 · 无底仓成本`;
+  }
+  return { estimated, hasPosition: Boolean(pos.hasPosition), baseShares, isCleared, currentCost, costChange };
+}
+
+function renderClearanceProfit(activeSymbol, positionEstimate, matchedProfit, openBuyAmount, openSellAmount) {
+  if (!activeSymbol) {
+    els.tClearanceProfit.textContent = "-";
+    els.tClearanceProfit.className = "";
+    els.tClearanceHint.textContent = "选择股票后计算";
+    els.tFinalProfit.textContent = "-";
+    els.tFinalProfit.className = "";
+    els.tFinalProfitHint.textContent = "选择股票后计算";
+    return;
+  }
+  if (!positionEstimate?.isCleared) {
+    els.tClearanceProfit.textContent = "-";
+    els.tClearanceProfit.className = "";
+    els.tClearanceHint.textContent = positionEstimate?.hasPosition ? "未匹配卖出数未等于原始持仓，暂不按清仓计算" : "初始持仓按 0 股处理，估算持仓不为 0";
+    els.tFinalProfit.textContent = money(matchedProfit);
+    els.tFinalProfit.className = profitClass(matchedProfit);
+    els.tFinalProfitHint.textContent = "未清仓，仅显示已匹配盈亏";
+    return;
+  }
+  const clearanceProfit = openSellAmount - openBuyAmount;
+  const finalProfit = matchedProfit + clearanceProfit;
+  els.tClearanceProfit.textContent = money(clearanceProfit);
+  els.tClearanceProfit.className = profitClass(clearanceProfit);
+  els.tClearanceHint.textContent = `未匹配卖出额 ${money(openSellAmount)} - 未匹配买入额 ${money(openBuyAmount)}`;
+  els.tFinalProfit.textContent = money(finalProfit);
+  els.tFinalProfit.className = profitClass(finalProfit);
+  els.tFinalProfitHint.textContent = "已匹配盈亏 + 清仓匹配盈亏";
 }
 
 function loadTrades() {
@@ -577,7 +873,7 @@ function addTrade() {
     return;
   }
   const amount = price * shares;
-  const fee = els.tFee.value.trim() ? Math.max(0, n(els.tFee.value)) : tradeFee(side, amount);
+  const fee = els.tFee.value.trim() ? Math.max(0, n(els.tFee.value)) : tradeFee(side, amount, account(), symbol, name);
   trades.push({ id: uid(), date: els.tDate.value || todayIso(), symbol, name, side, price, shares, amount, fee, createdAt: Date.now() });
   saveTrades();
   els.tFee.value = "";
@@ -725,7 +1021,7 @@ function parseBrokerTrades(text, mode = "broker1") {
       price,
       shares,
       amount,
-      fee: tradeFee(side, amount),
+      fee: tradeFee(side, amount, account(), symbol, name),
       note: `券商导入 ${name}${time ? ` ${time}` : ""}${dealNo ? ` 编号${dealNo}` : ""}`,
       createdAt: brokerCreatedAt(date, time, parsed.length),
     });
@@ -750,9 +1046,9 @@ function renderBrokerImportPreview(summary = {}) {
   els.brokerImportPreview.innerHTML = `
     <div class="table-wrap">
       <table>
-        <thead><tr><th>日期</th><th>代码</th><th>方向</th><th>价格</th><th>股数</th><th>金额</th><th>费用</th></tr></thead>
+        <thead><tr><th>日期</th><th>代码/名称</th><th>方向</th><th>价格</th><th>股数</th><th>金额</th><th>费用</th></tr></thead>
         <tbody>
-          ${previewRows.map((t) => `<tr>${cell("日期", esc(t.date))}${cell("代码", esc(t.symbol))}${cell("方向", t.side === "buy" ? "买入" : "卖出")}${cell("价格", money(t.price))}${cell("股数", qty(t.shares))}${cell("金额", money(t.amount))}${cell("费用", money(t.fee))}</tr>`).join("")}
+          ${previewRows.map((t) => `<tr>${cell("日期", esc(t.date))}${cell("代码/名称", symbolNameHtml(t.symbol, tradeName(t)), "symbol-cell")}${cell("方向", t.side === "buy" ? "买入" : "卖出")}${cell("价格", money(t.price))}${cell("股数", qty(t.shares))}${cell("金额", money(t.amount))}${cell("费用", money(t.fee))}</tr>`).join("")}
         </tbody>
       </table>
     </div>
@@ -838,12 +1134,27 @@ function renderOverview() {
     row.rows.push(trade);
   });
   const rows = [...bySymbol.values()].map((item) => {
-    const { matched, unmatched } = matchTrades(item.rows.sort((a, b) => `${a.date}-${a.createdAt}`.localeCompare(`${b.date}-${b.createdAt}`)));
+    const { matched, unmatched } = matchTrades(item.rows.sort((a, b) => `${a.date}-${a.createdAt}`.localeCompare(`${b.date}-${b.createdAt}`)), todayIso());
+    const openBuy = unmatched.filter((r) => r.side === "buy").reduce((sum, r) => sum + r.remaining, 0);
+    const openSell = unmatched.filter((r) => r.side === "sell").reduce((sum, r) => sum + r.remaining, 0);
+    const openBuyAmount = unmatched.filter((r) => r.side === "buy").reduce((sum, r) => sum + r.remaining * r.price, 0);
+    const openSellAmount = unmatched.filter((r) => r.side === "sell").reduce((sum, r) => sum + r.remaining * r.price, 0);
+    const pos = adjustedOriginalPosition(item.symbol, todayIso());
+    const baseShares = Number(pos?.shares || 0);
+    const estimatedShares = baseShares + openBuy - openSell;
+    const isCleared = pos.hasPosition ? (openSell === baseShares && openBuy === 0) : estimatedShares === 0;
+    const profit = matched.reduce((sum, r) => sum + r.profit, 0);
+    const clearanceProfit = isCleared ? openSellAmount - openBuyAmount : 0;
     return {
       ...item,
-      profit: matched.reduce((sum, r) => sum + r.profit, 0),
-      openBuy: unmatched.filter((r) => r.side === "buy").reduce((sum, r) => sum + r.remaining, 0),
-      openSell: unmatched.filter((r) => r.side === "sell").reduce((sum, r) => sum + r.remaining, 0),
+      profit,
+      openBuy,
+      openSell,
+      estimatedShares,
+      isCleared,
+      clearanceProfit,
+      totalProfit: profit + clearanceProfit,
+      status: isCleared ? "清仓" : "持仓",
     };
   });
   const numberSort = (field, direction = "desc") => (a, b) => {
@@ -852,6 +1163,10 @@ function renderOverview() {
   };
   const sorters = {
     lastDateDesc: (a, b) => b.lastDate.localeCompare(a.lastDate) || a.symbol.localeCompare(b.symbol),
+    totalProfitDesc: numberSort("totalProfit", "desc"),
+    totalProfitAsc: numberSort("totalProfit", "asc"),
+    statusOpen: (a, b) => Number(a.isCleared) - Number(b.isCleared) || b.totalProfit - a.totalProfit || a.symbol.localeCompare(b.symbol),
+    statusCleared: (a, b) => Number(b.isCleared) - Number(a.isCleared) || b.totalProfit - a.totalProfit || a.symbol.localeCompare(b.symbol),
     profitDesc: numberSort("profit", "desc"),
     profitAsc: numberSort("profit", "asc"),
     amountDesc: numberSort("amount", "desc"),
@@ -866,8 +1181,20 @@ function renderOverview() {
   };
   rows.sort(sorters[sortMode] || sorters.lastDateDesc);
   const sortLabel = els.overviewSort?.selectedOptions?.[0]?.textContent || "最近交易";
+  const clearedCount = rows.filter((r) => r.isCleared).length;
+  const openCount = rows.length - clearedCount;
+  const totalProfit = rows.reduce((sum, r) => sum + r.totalProfit, 0);
+  const openSellShares = rows.reduce((sum, r) => sum + r.openSell, 0);
   els.overviewSummary.textContent = `${rows.length} 只股票 · ${sortLabel}`;
-  els.overviewRows.innerHTML = rows.length ? rows.map((r, i) => `<tr>${cell("序号", i + 1)}${cell("代码/名称", symbolNameHtml(r.symbol, r.name), "symbol-cell")}${cell("交易次数", qty(r.count))}${cell("成交股数", `${qty(r.volume)} 股`)}${cell("总成交金额", money(r.amount))}${cell("总费用", money(r.fee))}${cell("已匹配盈亏", money(r.profit), profitClass(r.profit))}${cell("未匹配买入", `${qty(r.openBuy)} 股`)}${cell("未匹配卖出", `${qty(r.openSell)} 股`)}${cell("最后交易日", esc(r.lastDate || "-"))}${cell("操作", `<button data-action="view-symbol" data-symbol="${esc(r.symbol)}">查看</button>`, "action-cell")}</tr>`).join("") : `<tr><td colspan="11" class="empty">还没有交易流水。</td></tr>`;
+  if (els.overviewStats) {
+    els.overviewStats.innerHTML = `
+      <article><span>持仓股票</span><strong>${qty(openCount)}</strong></article>
+      <article><span>清仓股票</span><strong>${qty(clearedCount)}</strong></article>
+      <article><span>总盈亏</span><strong class="${profitClass(totalProfit)}">${money(totalProfit)}</strong></article>
+      <article><span>未匹配卖出</span><strong>${qty(openSellShares)} 股</strong></article>
+    `;
+  }
+  els.overviewRows.innerHTML = rows.length ? rows.map((r) => `<tr class="${r.isCleared ? "overview-cleared" : "overview-open"}">${cell("代码/名称", symbolNameHtml(r.symbol, r.name), "symbol-cell overview-symbol-cell")}${cell("状态", `<span class="status-pill ${r.isCleared ? "cleared" : "open"}">${r.status}</span>`)}${cell("总盈亏", money(r.totalProfit), profitClass(r.totalProfit))}${cell("已匹配", money(r.profit), profitClass(r.profit))}${cell("估算持仓", `${r.estimatedShares < 0 ? "-" : ""}${qty(Math.abs(r.estimatedShares))} 股`)}${cell("未匹配买入", `${qty(r.openBuy)} 股`)}${cell("未匹配卖出", `${qty(r.openSell)} 股`)}${cell("总成交额", money(r.amount))}${cell("操作", `<button data-action="view-symbol" data-symbol="${esc(r.symbol)}">查看</button>`, "action-cell")}</tr>`).join("") : `<tr><td colspan="9" class="empty">还没有交易流水。</td></tr>`;
 }
 
 function editTradeFromRow(row) {
@@ -907,11 +1234,43 @@ function tradeSymbols() {
   return [...counts.values()].sort((a, b) => a.symbol.localeCompare(b.symbol));
 }
 
+function symbolPositionSummary(symbol) {
+  const rows = trades.filter((trade) => trade.symbol === symbol).sort((a, b) => `${a.date}-${a.createdAt}`.localeCompare(`${b.date}-${b.createdAt}`));
+  const { unmatched } = matchTrades(rows, todayIso());
+  const openBuy = unmatched.filter((r) => r.side === "buy").reduce((sum, r) => sum + r.remaining, 0);
+  const openSell = unmatched.filter((r) => r.side === "sell").reduce((sum, r) => sum + r.remaining, 0);
+  const pos = adjustedOriginalPosition(symbol, todayIso());
+  const baseShares = Number(pos?.shares || 0);
+  const estimated = baseShares + openBuy - openSell;
+  const isCleared = pos.hasPosition ? (openSell === baseShares && openBuy === 0) : estimated === 0;
+  return { openBuy, openSell, baseShares, estimated, isCleared };
+}
+
 function symbolButtons(active) {
   const symbols = tradeSymbols();
-  return symbols.length
-    ? `<button class="symbol-chip${active ? "" : " active"}" data-symbol="" type="button">全部</button>${symbols.map((row) => `<button class="symbol-chip${active === row.symbol ? " active" : ""}" data-symbol="${esc(row.symbol)}" type="button">${symbolNameHtml(row.symbol, row.name)} <span>${row.count}</span></button>`).join("")}`
-    : `<span class="empty-chip">还没有交易股票</span>`;
+  if (!symbols.length) return `<span class="empty-chip">还没有交易股票</span>`;
+  const activeRows = [];
+  const clearedRows = [];
+  symbols.forEach((row) => {
+    const summary = symbolPositionSummary(row.symbol);
+    const item = { ...row, summary };
+    if (summary.isCleared) clearedRows.push(item);
+    else activeRows.push(item);
+  });
+  const chip = (row) => `<button class="symbol-chip${active === row.symbol ? " active" : ""}${row.summary.isCleared ? " cleared" : ""}" data-symbol="${esc(row.symbol)}" type="button">${symbolNameHtml(row.symbol, row.name)} <span>${row.count}</span></button>`;
+  const activeHtml = activeRows.length ? activeRows.map(chip).join("") : `<span class="empty-chip">当前没有持仓股票</span>`;
+  const clearedHtml = clearedRows.length ? clearedRows.map(chip).join("") : `<span class="empty-chip">还没有清仓股票</span>`;
+  return `
+    <button class="symbol-chip all-chip${active ? "" : " active"}" data-symbol="" type="button">全部</button>
+    <section class="symbol-section">
+      <div class="symbol-section-title">持仓股票 <b>${activeRows.length}</b></div>
+      <div class="symbol-grid symbol-grid-inner">${activeHtml}</div>
+    </section>
+    <details class="symbol-section cleared-section">
+      <summary>清仓股票 <b>${clearedRows.length}</b></summary>
+      <div class="symbol-grid symbol-grid-inner">${clearedHtml}</div>
+    </details>
+  `;
 }
 
 function renderSymbolChoices() {
@@ -935,7 +1294,7 @@ function closeSymbolModal() {
   els.symbolModal.hidden = true;
 }
 
-function matchTrades(rows) {
+function matchTrades(rows, throughDate = todayIso()) {
   const matched = [];
   const unmatched = [];
   const bySymbol = new Map();
@@ -945,9 +1304,19 @@ function matchTrades(rows) {
   });
   bySymbol.forEach((items, symbol) => {
     const open = [];
-    items.forEach((trade) => {
+    const sortedItems = items.sort((a, b) => `${a.date}-${a.createdAt || 0}`.localeCompare(`${b.date}-${b.createdAt || 0}`));
+    const events = equityEventsForSymbol(symbol, throughDate);
+    let eventIndex = 0;
+    const applyEventsUntil = (date) => {
+      while (eventIndex < events.length && events[eventIndex].date <= date) {
+        applyEquityEventToOpen(open, events[eventIndex]);
+        eventIndex += 1;
+      }
+    };
+    sortedItems.forEach((trade) => {
+      applyEventsUntil(trade.date);
       while (trade.remaining > 0) {
-        const index = findOpposite(open, trade.side);
+        const index = findProfitableOpposite(open, trade);
         if (index < 0) break;
         const other = open[index];
         const shares = Math.min(trade.remaining, other.remaining);
@@ -964,30 +1333,177 @@ function matchTrades(rows) {
       }
       if (trade.remaining > 0) open.push(trade);
     });
+    applyEventsUntil(throughDate || todayIso());
     unmatched.push(...open.filter((t) => t.remaining > 0));
   });
   return { matched, unmatched };
 }
 
-function findOpposite(open, side) {
+function findProfitableOpposite(open, trade) {
   for (let i = open.length - 1; i >= 0; i -= 1) {
-    if (open[i].side !== side) return i;
+    const other = open[i];
+    if (other.side === trade.side) continue;
+    const buy = trade.side === "buy" ? trade : other;
+    const sell = trade.side === "sell" ? trade : other;
+    if (sell.price > buy.price) return i;
   }
   return -1;
 }
 
+function matchedEventDate(row) {
+  return row.sellDate > row.buyDate ? row.sellDate : row.buyDate;
+}
+
+function monthKey(date) {
+  return String(date || "").slice(0, 7);
+}
+
+function shiftMonth(key, delta) {
+  const [year, month] = key.split("-").map(Number);
+  const date = new Date(year, month - 1 + delta, 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function matchedDayRows(date) {
+  return matchedCalendarRows.filter((row) => matchedEventDate(row) === date);
+}
+
+function renderDailyMatchedRows(rows) {
+  if (!rows.length) return `<tr><td colspan="8" class="empty">当天没有匹配明细。</td></tr>`;
+  return rows.map((r) => `<tr>${cell("卖出日期", esc(r.sellDate), "sell-date-cell")}${cell("卖价", money(r.sellPrice), "sell-price-cell")}${cell("买入日期", esc(r.buyDate), "buy-date-cell")}${cell("买价", money(r.buyPrice), "buy-price-cell")}${cell("股数", qty(r.shares), "shares-cell")}${cell("成交金额", money(r.amount), "amount-cell")}${cell("费用", money(r.fee), "fee-cell")}${cell("盈亏", money(r.profit), `${profitClass(r.profit)} profit-cell`)}</tr>`).join("");
+}
+
+function renderMatchedCalendar(matched) {
+  matchedCalendarRows = [...matched].sort((a, b) => matchedEventDate(b).localeCompare(matchedEventDate(a)));
+  const grid = document.querySelector("#matchedCalendarGrid");
+  const title = document.querySelector("#matchedCalendarTitle");
+  const modalRows = document.querySelector("#matchedModalRows");
+  if (!grid || !title || !modalRows) return;
+  if (!matchedCalendarRows.length) {
+    matchedCalendarMonth = "";
+    matchedCalendarSelected = "";
+    title.textContent = "-";
+    grid.innerHTML = `<div class="calendar-empty">还没有已匹配记录。</div>`;
+    modalRows.innerHTML = `<tr><td colspan="8" class="empty">还没有可匹配的反向交易。</td></tr>`;
+    ["matchedMonthProfit", "matchedMonthAmount", "matchedYearProfit", "matchedYearAmount"].forEach((id) => {
+      const node = document.querySelector(`#${id}`);
+      if (node) node.textContent = "-";
+    });
+    return;
+  }
+  const latestDate = matchedEventDate(matchedCalendarRows[0]);
+  if (!matchedCalendarMonth) matchedCalendarMonth = monthKey(latestDate);
+  if (!matchedCalendarSelected || monthKey(matchedCalendarSelected) !== matchedCalendarMonth) {
+    const firstInMonth = matchedCalendarRows.find((row) => monthKey(matchedEventDate(row)) === matchedCalendarMonth);
+    matchedCalendarSelected = firstInMonth ? matchedEventDate(firstInMonth) : `${matchedCalendarMonth}-01`;
+  }
+  const [year, month] = matchedCalendarMonth.split("-").map(Number);
+  const firstDay = new Date(year, month - 1, 1);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const offset = (firstDay.getDay() + 6) % 7;
+  const byDate = new Map();
+  matchedCalendarRows.forEach((row) => {
+    const date = matchedEventDate(row);
+    const item = byDate.get(date) || { profit: 0, amount: 0, count: 0 };
+    item.profit += row.profit;
+    item.amount += row.amount;
+    item.count += 1;
+    byDate.set(date, item);
+  });
+  const cells = Array.from({ length: offset }, () => `<div class="calendar-day muted"></div>`);
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const date = `${matchedCalendarMonth}-${String(day).padStart(2, "0")}`;
+    const data = byDate.get(date);
+    cells.push(`<button class="calendar-day${date === matchedCalendarSelected ? " active" : ""}${data ? " has-match" : ""}" data-date="${date}" type="button"><span>${day}</span>${data ? `<strong class="${profitClass(data.profit)}">${money(data.profit)}</strong><em>${money(data.amount)}</em>` : ""}</button>`);
+  }
+  title.textContent = matchedCalendarMonth;
+  grid.innerHTML = cells.join("");
+  const monthRows = matchedCalendarRows.filter((row) => monthKey(matchedEventDate(row)) === matchedCalendarMonth);
+  const yearRows = matchedCalendarRows.filter((row) => matchedEventDate(row).startsWith(`${year}-`));
+  const monthProfit = monthRows.reduce((sum, row) => sum + row.profit, 0);
+  const monthAmount = monthRows.reduce((sum, row) => sum + row.amount, 0);
+  const yearProfit = yearRows.reduce((sum, row) => sum + row.profit, 0);
+  const yearAmount = yearRows.reduce((sum, row) => sum + row.amount, 0);
+  document.querySelector("#matchedMonthProfit").textContent = money(monthProfit);
+  document.querySelector("#matchedMonthProfit").className = profitClass(monthProfit);
+  document.querySelector("#matchedMonthAmount").textContent = money(monthAmount);
+  document.querySelector("#matchedYearProfit").textContent = money(yearProfit);
+  document.querySelector("#matchedYearProfit").className = profitClass(yearProfit);
+  document.querySelector("#matchedYearAmount").textContent = money(yearAmount);
+  modalRows.innerHTML = renderDailyMatchedRows(matchedDayRows(matchedCalendarSelected));
+}
+
+function renderMatchedDetailRows(matched) {
+  if (!matched.length) return `<tr><td colspan="8" class="empty">还没有可匹配的反向交易。</td></tr>`;
+  const day = 24 * 60 * 60 * 1000;
+  const latestTime = Math.max(...matched.map((row) => new Date(matchedEventDate(row)).getTime()).filter(Number.isFinite));
+  const cutoff = latestTime - (6 * day);
+  const recent = [];
+  const historical = [];
+  matched.forEach((row) => {
+    const time = new Date(matchedEventDate(row)).getTime();
+    if (Number.isFinite(time) && time >= cutoff) recent.push(row);
+    else historical.push(row);
+  });
+  const detailRows = recent.map((r) => `<tr>${cell("卖出日期", esc(r.sellDate), "sell-date-cell")}${cell("卖价", money(r.sellPrice), "sell-price-cell")}${cell("买入日期", esc(r.buyDate), "buy-date-cell")}${cell("买价", money(r.buyPrice), "buy-price-cell")}${cell("股数", qty(r.shares), "shares-cell")}${cell("成交金额", money(r.amount), "amount-cell")}${cell("费用", money(r.fee), "fee-cell")}${cell("盈亏", money(r.profit), `${profitClass(r.profit)} profit-cell`)}</tr>`);
+  const groups = new Map();
+  historical.forEach((row) => {
+    const stage = matchedEventDate(row).slice(0, 7);
+    const group = groups.get(stage) || { stage, start: matchedEventDate(row), end: matchedEventDate(row), count: 0, shares: 0, amount: 0, fee: 0, profit: 0 };
+    const date = matchedEventDate(row);
+    group.start = date < group.start ? date : group.start;
+    group.end = date > group.end ? date : group.end;
+    group.count += 1;
+    group.shares += row.shares;
+    group.amount += row.amount;
+    group.fee += row.fee;
+    group.profit += row.profit;
+    groups.set(stage, group);
+  });
+  const stageRows = [...groups.values()].sort((a, b) => b.stage.localeCompare(a.stage)).map((g) => `<tr class="stage-summary-row">${cell("阶段", esc(g.stage), "stage-cell")}${cell("期间", `${esc(g.start)} - ${esc(g.end)}`, "stage-range-cell")}${cell("匹配", `${qty(g.count)} 组`, "stage-count-cell")}${cell("均价", "-")}${cell("股数", qty(g.shares), "shares-cell")}${cell("成交金额", money(g.amount), "amount-cell")}${cell("费用", money(g.fee), "fee-cell")}${cell("阶段盈亏", money(g.profit), `${profitClass(g.profit)} profit-cell`)}</tr>`);
+  return [...detailRows, ...stageRows].join("");
+}
+
+function renderUnmatchedGroups(unmatched) {
+  if (!unmatched.length) return `<tr><td colspan="8" class="empty">没有未匹配交易。</td></tr>`;
+  const sorted = [...unmatched].sort((a, b) => `${b.date}-${b.createdAt || ""}`.localeCompare(`${a.date}-${a.createdAt || ""}`));
+  const renderSide = (side, title, className) => {
+    const rows = sorted.filter((row) => row.side === side);
+    const totalShares = rows.reduce((sum, row) => sum + row.remaining, 0);
+    const totalAmount = rows.reduce((sum, row) => sum + row.remaining * row.price, 0);
+    const avgPrice = totalShares ? totalAmount / totalShares : 0;
+    const chips = rows.length ? rows.map((row) => `<span class="unmatched-chip ${className}" title="${esc(row.date)}">${priceText(row.price)}*${side === "sell" ? "-" : ""}${qty(row.remaining)}</span>`).join("") : `<span class="empty-chip">没有${title}</span>`;
+    return `
+      <section class="unmatched-group ${className}">
+        <div class="unmatched-group-title">
+          <strong>${title}</strong>
+          <span>${qty(totalShares)} 股 · 均价 ${avgPrice ? priceText(avgPrice) : "-"}</span>
+        </div>
+        <div class="unmatched-chip-grid">${chips}</div>
+      </section>
+    `;
+  };
+  return `<tr class="unmatched-group-row"><td colspan="8">${renderSide("buy", "未匹配买入", "buy")}${renderSide("sell", "未匹配卖出", "sell")}</td></tr>`;
+}
+
 function renderQuery() {
   renderSymbolChoices();
+  const activeSymbol = normalizeSymbol(els.tFilterSymbol.value);
   const rows = filteredTrades();
-  const allMatched = matchTrades([...trades].sort((a, b) => `${a.date}-${a.createdAt}`.localeCompare(`${b.date}-${b.createdAt}`))).matched;
+  const throughDate = els.tEndDate.value || todayIso();
+  const allMatched = matchTrades([...trades].sort((a, b) => `${a.date}-${a.createdAt}`.localeCompare(`${b.date}-${b.createdAt}`)), todayIso()).matched;
   const allProfit = allMatched.reduce((sum, r) => sum + r.profit, 0);
-  const { matched, unmatched } = matchTrades(rows);
+  const { matched, unmatched } = matchTrades(rows, throughDate);
   const profit = matched.reduce((sum, r) => sum + r.profit, 0);
   const totalFees = rows.reduce((sum, r) => sum + Number(r.fee || 0), 0);
   const totalAmount = rows.reduce((sum, r) => sum + Number(r.amount || r.price * r.shares || 0), 0);
   const matchedShares = matched.reduce((sum, r) => sum + r.shares, 0);
   const openBuy = unmatched.filter((r) => r.side === "buy").reduce((sum, r) => sum + r.remaining, 0);
   const openSell = unmatched.filter((r) => r.side === "sell").reduce((sum, r) => sum + r.remaining, 0);
+  const openBuyAmount = unmatched.filter((r) => r.side === "buy").reduce((sum, r) => sum + r.remaining * r.price, 0);
+  const openSellAmount = unmatched.filter((r) => r.side === "sell").reduce((sum, r) => sum + r.remaining * r.price, 0);
+  const totalBuyAmount = rows.filter((r) => r.side === "buy").reduce((sum, r) => sum + Number(r.amount || r.price * r.shares || 0), 0);
+  const totalSellAmount = rows.filter((r) => r.side === "sell").reduce((sum, r) => sum + Number(r.amount || r.price * r.shares || 0), 0);
   els.allMatchedProfit.textContent = money(allProfit);
   els.allMatchedProfit.className = profitClass(allProfit);
   els.tMatchedProfit.textContent = money(profit);
@@ -996,14 +1512,18 @@ function renderQuery() {
   els.tTotalAmount.textContent = money(totalAmount);
   els.tMatchedShares.textContent = `${qty(matchedShares)} 股`;
   els.tOpenBuyShares.textContent = `${qty(openBuy)} 股`;
+  els.tOpenBuyAvg.textContent = openBuy ? priceText(openBuyAmount / openBuy) : "-";
   els.tOpenSellShares.textContent = `${qty(openSell)} 股`;
-  els.matchedSummary.textContent = `${matched.length} 组匹配`;
+  els.tOpenSellAvg.textContent = openSell ? priceText(openSellAmount / openSell) : "-";
+  const positionEstimate = renderPositionEstimate(activeSymbol, openBuy, openSell, profit, totalBuyAmount, totalSellAmount);
+  renderClearanceProfit(activeSymbol, positionEstimate, profit, openBuyAmount, openSellAmount);
+  els.matchedSummary.textContent = `${matched.length} 组匹配 · 最近 7 天明细`;
   els.unmatchedSummary.textContent = `${unmatched.length} 条未匹配`;
-  const matchedHtml = matched.length ? matched.map((r, i) => `<tr>${cell("序号", i + 1, "seq-cell")}${cell("代码/名称", symbolNameHtml(r.symbol, r.name), "symbol-cell")}${cell("卖出日期", esc(r.sellDate), "sell-date-cell")}${cell("卖价", money(r.sellPrice), "sell-price-cell")}${cell("买入日期", esc(r.buyDate), "buy-date-cell")}${cell("买价", money(r.buyPrice), "buy-price-cell")}${cell("股数", qty(r.shares), "shares-cell")}${cell("成交金额", money(r.amount), "amount-cell")}${cell("费用", money(r.fee), "fee-cell")}${cell("盈亏", money(r.profit), `${profitClass(r.profit)} profit-cell`)}</tr>`).join("") : `<tr><td colspan="10" class="empty">还没有可匹配的反向交易。</td></tr>`;
+  const matchedHtml = renderMatchedDetailRows(matched);
   els.matchedRows.innerHTML = matchedHtml;
   const matchedModalRows = document.querySelector("#matchedModalRows");
-  if (matchedModalRows) matchedModalRows.innerHTML = matchedHtml;
-  els.unmatchedRows.innerHTML = unmatched.length ? unmatched.map((r, i) => `<tr>${cell("序号", i + 1, "seq-cell")}${cell("日期", esc(r.date), "date-cell")}${cell("代码/名称", symbolNameHtml(r.symbol, tradeName(r)), "symbol-cell")}${cell("方向", r.side === "buy" ? "买入" : "卖出", "tag-cell side-cell")}${cell("价格", money(r.price), "price-cell")}${cell("剩余股数", qty(r.remaining), "shares-cell")}${cell("成交金额", money(r.remaining * r.price), "amount-cell")}${cell("剩余费用", money(r.remainingFee), "fee-cell")}</tr>`).join("") : `<tr><td colspan="8" class="empty">没有未匹配交易。</td></tr>`;
+  if (matchedModalRows) renderMatchedCalendar(matched);
+  els.unmatchedRows.innerHTML = renderUnmatchedGroups(unmatched);
 }
 
 function exportBackup() {
@@ -1028,6 +1548,8 @@ async function importBackup(file) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   trades = payload.trades;
   restoreState();
+  renderOriginalPositions();
+  renderEquityEvents();
   renderGrids();
   runScenarios();
   renderAllTrades();
@@ -1051,6 +1573,9 @@ els.tabs.forEach((tab) => tab.addEventListener("click", () => switchWindow(tab.d
 els.scenarioTabs.forEach((tab) => tab.addEventListener("click", () => switchScenarioPane(tab.dataset.scenarioPane)));
 els.addGrid.addEventListener("click", () => addGrid());
 document.addEventListener("input", (event) => {
+  if (event.target.matches("input, select")) scheduleSave();
+});
+document.addEventListener("change", (event) => {
   if (event.target.matches("input, select")) scheduleSave();
 });
 document.addEventListener("change", (event) => {
@@ -1079,6 +1604,25 @@ els.tSymbol.addEventListener("blur", () => autofillTradeName(true));
 els.brokerImportFile.addEventListener("change", () => handleBrokerImportFile(els.brokerImportFile.files[0]));
 els.confirmBrokerImport.addEventListener("click", confirmBrokerImport);
 els.clearBrokerImport.addEventListener("click", clearBrokerImportPreview);
+els.positionSymbol.addEventListener("change", autofillPositionName);
+els.positionSymbol.addEventListener("blur", autofillPositionName);
+els.savePosition.addEventListener("click", saveOriginalPosition);
+els.positionList.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-action]");
+  const row = event.target.closest(".position-row");
+  if (!button || !row) return;
+  if (button.dataset.action === "load-position") loadOriginalPosition(row.dataset.symbol);
+  if (button.dataset.action === "delete-position") deleteOriginalPosition(row.dataset.symbol);
+});
+els.equitySymbol.addEventListener("change", autofillEquityName);
+els.equitySymbol.addEventListener("blur", autofillEquityName);
+els.saveEquity.addEventListener("click", saveEquityEvent);
+els.equityList.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-action='delete-equity']");
+  const row = event.target.closest(".equity-row");
+  if (!button || !row) return;
+  deleteEquityEvent(row.dataset.id);
+});
 els.tradeFlowRows.addEventListener("click", (event) => {
   const row = event.target.closest("tr");
   const action = event.target.dataset.action;
@@ -1128,13 +1672,38 @@ els.symbolModal.addEventListener("click", (event) => {
 });
 document.addEventListener("click", (event) => {
   if (event.target.closest("#openMatchedModal")) {
+    renderMatchedCalendar(matchedCalendarRows);
     document.querySelector("#matchedModal").hidden = false;
   }
   if (event.target.closest("#closeMatchedModal") || event.target.matches("[data-close-matched-modal]")) {
     document.querySelector("#matchedModal").hidden = true;
   }
+  const dayButton = event.target.closest(".calendar-day[data-date]");
+  if (dayButton) {
+    matchedCalendarSelected = dayButton.dataset.date;
+    matchedCalendarMonth = monthKey(matchedCalendarSelected);
+    renderMatchedCalendar(matchedCalendarRows);
+  }
+  if (event.target.closest("#matchedCalendarPrev") && matchedCalendarMonth) {
+    matchedCalendarMonth = shiftMonth(matchedCalendarMonth, -1);
+    matchedCalendarSelected = "";
+    renderMatchedCalendar(matchedCalendarRows);
+  }
+  if (event.target.closest("#matchedCalendarNext") && matchedCalendarMonth) {
+    matchedCalendarMonth = shiftMonth(matchedCalendarMonth, 1);
+    matchedCalendarSelected = "";
+    renderMatchedCalendar(matchedCalendarRows);
+  }
 });
-els.applyTradeFilter.addEventListener("click", () => {
+els.tStartDate.addEventListener("change", () => {
+  renderQuery();
+  saveState();
+});
+els.tEndDate.addEventListener("change", () => {
+  renderQuery();
+  saveState();
+});
+els.applyTradeFilter?.addEventListener("click", () => {
   renderQuery();
   saveState();
 });
@@ -1147,7 +1716,10 @@ ensureMatchedDetailModal();
 loadTrades();
 restoreState();
 if (!els.tDate.value) els.tDate.value = todayIso();
+if (!els.equityDate.value) els.equityDate.value = todayIso();
 autofillTradeName();
+renderOriginalPositions();
+renderEquityEvents();
 renderGrids();
 runScenarios();
 renderAllTrades();

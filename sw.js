@@ -1,11 +1,14 @@
-const CACHE_NAME = "grid-trading-v16";
+const CACHE_NAME = "grid-trading-v38";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
   "./script.js",
   "./manifest.webmanifest",
-  "./icon.svg"
+  "./icon.svg",
+  "./apple-touch-icon.png",
+  "./icon-192.png",
+  "./icon-512.png"
 ];
 
 self.addEventListener("install", (event) => {
