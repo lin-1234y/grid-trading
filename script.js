@@ -1476,7 +1476,7 @@ function renderUnmatchedGroups(unmatched) {
     const totalShares = rows.reduce((sum, row) => sum + row.remaining, 0);
     const totalAmount = rows.reduce((sum, row) => sum + row.remaining * row.price, 0);
     const avgPrice = totalShares ? totalAmount / totalShares : 0;
-    const chips = rows.length ? rows.map((row) => `<span class="unmatched-chip ${className}" title="${esc(row.date)}">${priceText(row.price)}*${side === "sell" ? "-" : ""}${qty(row.remaining)}</span>`).join("") : `<span class="empty-chip">没有${title}</span>`;
+    const chips = rows.length ? rows.map((row) => `<span class="unmatched-chip ${className}" tabindex="0" data-date="${esc(row.date)}" title="${esc(row.date)}">${priceText(row.price)}*${side === "sell" ? "-" : ""}${qty(row.remaining)}</span>`).join("") : `<span class="empty-chip">没有${title}</span>`;
     return `
       <section class="unmatched-group ${className}">
         <div class="unmatched-group-title">
