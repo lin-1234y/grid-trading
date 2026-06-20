@@ -163,7 +163,7 @@ function ensureMatchedDetailModal() {
               <button id="matchedCalendarNext" type="button">下月</button>
             </div>
             <div class="calendar-weekdays">
-              <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+              <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span>
             </div>
             <div id="matchedCalendarGrid" class="matched-calendar-grid"></div>
             <div class="calendar-total-grid">
@@ -1188,14 +1188,14 @@ function renderOverview() {
   const clearedCount = rows.filter((r) => r.isCleared).length;
   const openCount = rows.length - clearedCount;
   const totalProfit = rows.reduce((sum, r) => sum + r.totalProfit, 0);
-  const openSellShares = rows.reduce((sum, r) => sum + r.openSell, 0);
+  const matchedProfitTotal = rows.reduce((sum, r) => sum + r.profit, 0);
   els.overviewSummary.textContent = `${rows.length} 只股票 · ${sortLabel}`;
   if (els.overviewStats) {
     els.overviewStats.innerHTML = `
       <article><span>持仓股票</span><strong>${qty(openCount)}</strong></article>
       <article><span>清仓股票</span><strong>${qty(clearedCount)}</strong></article>
       <article><span>总盈亏</span><strong class="${profitClass(totalProfit)}">${money(totalProfit)}</strong></article>
-      <article><span>未匹配卖出</span><strong>${qty(openSellShares)} 股</strong></article>
+      <article><span>已匹配实现盈亏</span><strong class="${profitClass(matchedProfitTotal)}">${money(matchedProfitTotal)}</strong></article>
     `;
   }
   els.overviewRows.innerHTML = rows.length ? rows.map((r) => `<tr class="${r.isCleared ? "overview-cleared" : "overview-open"}">${cell("代码/名称", symbolNameHtml(r.symbol, r.name), "symbol-cell overview-symbol-cell")}${cell("状态", `<span class="status-pill ${r.isCleared ? "cleared" : "open"}">${r.status}</span>`)}${cell("总盈亏", money(r.totalProfit), profitClass(r.totalProfit))}${cell("已匹配", money(r.profit), profitClass(r.profit))}${cell("估算持仓", `${r.estimatedShares < 0 ? "-" : ""}${qty(Math.abs(r.estimatedShares))} 股`)}${cell("未匹配买入", `${qty(r.openBuy)} 股`)}${cell("未匹配卖出", `${qty(r.openSell)} 股`)}${cell("总成交额", money(r.amount))}${cell("操作", `<button data-action="view-symbol" data-symbol="${esc(r.symbol)}">查看</button>`, "action-cell")}</tr>`).join("") : `<tr><td colspan="9" class="empty">还没有交易流水。</td></tr>`;
@@ -1320,7 +1320,7 @@ function matchTrades(rows, throughDate = todayIso()) {
     sortedItems.forEach((trade) => {
       applyEventsUntil(trade.date);
       while (trade.remaining > 0) {
-        const index = findProfitableOpposite(open, trade);
+        const index = findNearestOpposite(open, trade);
         if (index < 0) break;
         const other = open[index];
         const shares = Math.min(trade.remaining, other.remaining);
@@ -1343,13 +1343,11 @@ function matchTrades(rows, throughDate = todayIso()) {
   return { matched, unmatched };
 }
 
-function findProfitableOpposite(open, trade) {
+function findNearestOpposite(open, trade) {
   for (let i = open.length - 1; i >= 0; i -= 1) {
     const other = open[i];
     if (other.side === trade.side) continue;
-    const buy = trade.side === "buy" ? trade : other;
-    const sell = trade.side === "sell" ? trade : other;
-    if (sell.price > buy.price) return i;
+    return i;
   }
   return -1;
 }
@@ -1402,9 +1400,9 @@ function renderMatchedCalendar(matched) {
     matchedCalendarSelected = firstInMonth ? matchedEventDate(firstInMonth) : `${matchedCalendarMonth}-01`;
   }
   const [year, month] = matchedCalendarMonth.split("-").map(Number);
-  const firstDay = new Date(year, month - 1, 1);
   const daysInMonth = new Date(year, month, 0).getDate();
-  const offset = (firstDay.getDay() + 6) % 7;
+  const firstWeekday = (new Date(year, month - 1, 1).getDay() + 6) % 7;
+  const offset = Math.min(firstWeekday, 5);
   const byDate = new Map();
   matchedCalendarRows.forEach((row) => {
     const date = matchedEventDate(row);
@@ -1417,6 +1415,8 @@ function renderMatchedCalendar(matched) {
   const cells = Array.from({ length: offset }, () => `<div class="calendar-day muted"></div>`);
   for (let day = 1; day <= daysInMonth; day += 1) {
     const date = `${matchedCalendarMonth}-${String(day).padStart(2, "0")}`;
+    const weekday = new Date(year, month - 1, day).getDay();
+    if (weekday === 0 || weekday === 6) continue;
     const data = byDate.get(date);
     cells.push(`<button class="calendar-day${date === matchedCalendarSelected ? " active" : ""}${data ? " has-match" : ""}" data-date="${date}" type="button"><span>${day}</span>${data ? `<strong class="${profitClass(data.profit)}">${plainInteger(data.profit)}</strong><em>${plainInteger(data.amount)}</em>` : ""}</button>`);
   }
@@ -1494,8 +1494,14 @@ function renderQuery() {
   renderSymbolChoices();
   const activeSymbol = normalizeSymbol(els.tFilterSymbol.value);
   const rows = filteredTrades();
+  const start = els.tStartDate.value;
+  const end = els.tEndDate.value;
   const throughDate = els.tEndDate.value || todayIso();
-  const allMatched = matchTrades([...trades].sort((a, b) => `${a.date}-${a.createdAt}`.localeCompare(`${b.date}-${b.createdAt}`)), todayIso()).matched;
+  const periodTrades = trades
+    .filter((t) => !start || t.date >= start)
+    .filter((t) => !end || t.date <= end)
+    .sort((a, b) => `${a.date}-${a.createdAt}`.localeCompare(`${b.date}-${b.createdAt}`));
+  const allMatched = matchTrades(periodTrades, throughDate).matched;
   const allProfit = allMatched.reduce((sum, r) => sum + r.profit, 0);
   const { matched, unmatched } = matchTrades(rows, throughDate);
   const profit = matched.reduce((sum, r) => sum + r.profit, 0);

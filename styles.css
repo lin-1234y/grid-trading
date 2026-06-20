@@ -1270,7 +1270,7 @@ p {
 .calendar-weekdays,
 .matched-calendar-grid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 6px;
 }
 
@@ -1327,7 +1327,6 @@ p {
 }
 
 .calendar-day strong {
-  color: #ff5c6b !important;
   font-size: 15px;
   font-weight: 950;
 }
@@ -1775,7 +1774,7 @@ tbody tr:hover {
   }
 
   .calendar-total-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .unmatched-chip {
