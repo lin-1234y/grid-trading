@@ -912,17 +912,21 @@ p {
 
 .symbol-code {
   display: block;
-  color: #ffd166;
-  font-weight: 850;
+  color: #ffe8a6;
+  font-size: 13px;
+  font-weight: 800;
   line-height: 1.2;
+  text-shadow: none;
 }
 
 .symbol-name {
   display: block;
-  margin-top: 3px;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.25;
+  margin-top: 4px;
+  color: #ffd700;
+  font-size: 16px;
+  font-weight: 950;
+  line-height: 1.12;
+  text-shadow: 0 0 7px rgba(255, 215, 0, 0.46);
 }
 
 .overview-symbol-cell .symbol-code {
@@ -1920,6 +1924,18 @@ tbody tr:hover {
   #matchedRows .symbol-cell,
   #unmatchedRows .symbol-cell,
   #overviewRows .symbol-cell {
+    font-size: inherit;
+  }
+
+  #tradeFlowRows .symbol-code,
+  #matchedRows .symbol-code,
+  #unmatchedRows .symbol-code {
+    font-size: 12px;
+  }
+
+  #tradeFlowRows .symbol-name,
+  #matchedRows .symbol-name,
+  #unmatchedRows .symbol-name {
     font-size: 17px;
   }
 
@@ -2143,11 +2159,22 @@ tbody tr:hover {
   }
 
   .metric {
-    padding: 14px;
+    padding: 12px;
   }
 
   .metrics {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .metric strong {
+    font-size: 18px;
+  }
+
+  .profit-metric em,
+  .position-metric em {
+    font-size: 11px;
+    line-height: 1.35;
   }
 
 }

@@ -205,6 +205,10 @@ function qty(value) {
   return Number(value || 0).toLocaleString("zh-CN", { maximumFractionDigits: 0 });
 }
 
+function plainInteger(value) {
+  return Number(value || 0).toLocaleString("zh-CN", { maximumFractionDigits: 0 });
+}
+
 function fixed(value) {
   return Number(value || 0).toFixed(4);
 }
@@ -1414,7 +1418,7 @@ function renderMatchedCalendar(matched) {
   for (let day = 1; day <= daysInMonth; day += 1) {
     const date = `${matchedCalendarMonth}-${String(day).padStart(2, "0")}`;
     const data = byDate.get(date);
-    cells.push(`<button class="calendar-day${date === matchedCalendarSelected ? " active" : ""}${data ? " has-match" : ""}" data-date="${date}" type="button"><span>${day}</span>${data ? `<strong class="${profitClass(data.profit)}">${money(data.profit)}</strong><em>${money(data.amount)}</em>` : ""}</button>`);
+    cells.push(`<button class="calendar-day${date === matchedCalendarSelected ? " active" : ""}${data ? " has-match" : ""}" data-date="${date}" type="button"><span>${day}</span>${data ? `<strong class="${profitClass(data.profit)}">${plainInteger(data.profit)}</strong><em>${plainInteger(data.amount)}</em>` : ""}</button>`);
   }
   title.textContent = matchedCalendarMonth;
   grid.innerHTML = cells.join("");
