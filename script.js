@@ -119,6 +119,9 @@ let flowFilterSymbol = "";
 let flowRenderLimit = 200;
 let symbolPickerMode = "query";
 const STORAGE_KEY = "gridTradingToolState";
+const TRADE_DB_NAME = "gridTradingTradesDb";
+const TRADE_DB_STORE = "kv";
+const TRADE_DB_KEY = "trades";
 const FLOW_RENDER_STEP = 200;
 const IMPORT_CHUNK_SIZE = 500;
 const STOCK_NAME_MAP = {
@@ -302,9 +305,10 @@ function renderGrids() {
   });
 }
 
-function collectState() {
+function collectState(options = {}) {
+  const includeTrades = options.includeTrades !== false;
   if (els.gridCards.children.length) readGrids();
-  return {
+  const state = {
     activeWindow: document.querySelector(".tab.active")?.dataset.window || "scenarioWindow",
     scenario: {
       symbol: els.symbol.value,
@@ -341,16 +345,93 @@ function collectState() {
     },
     originalPositions,
     equityEvents,
-    trades,
   };
+  if (includeTrades) state.trades = trades;
+  return state;
 }
 
 function saveState() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(collectState()));
-  } catch {
-    els.status.textContent = "浏览器本地存储不可用，请导出备份保存。";
+    localStorage.removeItem("gridTradingTrades");
+    const payload = JSON.stringify(collectState({ includeTrades: false }));
+    localStorage.setItem(STORAGE_KEY, payload);
+    if (localStorage.getItem(STORAGE_KEY) !== payload) {
+      throw new Error("保存校验失败");
+    }
+  } catch (error) {
+    const message = error?.name === "QuotaExceededError"
+      ? "浏览器本地存储空间不足，新增数据可能没有保存。请先导出备份，再减少流水或改用更大的存储方案。"
+      : "浏览器本地存储不可用，新增数据可能没有保存。请导出备份保存。";
+    els.status.textContent = message;
+    window.alert(message);
   }
+}
+
+async function migrateLegacyTradeStorage() {
+  try {
+    const stateHasTrades = (() => {
+      try {
+        const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+        return Array.isArray(state?.trades) && state.trades.length > 0;
+      } catch {
+        return false;
+      }
+    })();
+    if (trades.length && (localStorage.getItem("gridTradingTrades") !== null || stateHasTrades)) {
+      await saveTradesToDb(trades);
+      saveState();
+    }
+  } catch (error) {
+    showStorageError(error, "迁移");
+  }
+}
+
+function openTradeDb() {
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) {
+      reject(new Error("当前浏览器不支持 IndexedDB"));
+      return;
+    }
+    const request = indexedDB.open(TRADE_DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore(TRADE_DB_STORE);
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error("IndexedDB 打开失败"));
+  });
+}
+
+function tradeDbRequest(mode, action) {
+  return openTradeDb().then((db) => new Promise((resolve, reject) => {
+    const tx = db.transaction(TRADE_DB_STORE, mode);
+    const store = tx.objectStore(TRADE_DB_STORE);
+    const request = action(store);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error("IndexedDB 操作失败"));
+    tx.oncomplete = () => db.close();
+    tx.onerror = () => {
+      db.close();
+      reject(tx.error || new Error("IndexedDB 事务失败"));
+    };
+  }));
+}
+
+function loadTradesFromDb() {
+  return tradeDbRequest("readonly", (store) => store.get(TRADE_DB_KEY));
+}
+
+function saveTradesToDb(rows) {
+  return tradeDbRequest("readwrite", (store) => store.put(rows, TRADE_DB_KEY));
+}
+
+function deleteTradesFromDb() {
+  return tradeDbRequest("readwrite", (store) => store.delete(TRADE_DB_KEY));
+}
+
+function showStorageError(error, action = "保存") {
+  const message = `${action}交易流水失败：${error?.message || error || "浏览器本地数据库不可用"}。请先导出备份保存。`;
+  els.status.textContent = message;
+  window.alert(message);
 }
 
 function scheduleSave() {
@@ -396,7 +477,7 @@ function restoreState() {
   if (flow.symbol !== undefined) flowFilterSymbol = flow.symbol;
   originalPositions = state.originalPositions && typeof state.originalPositions === "object" ? state.originalPositions : {};
   equityEvents = Array.isArray(state.equityEvents) ? state.equityEvents : [];
-  if (Array.isArray(state.trades)) trades = state.trades;
+  if (Array.isArray(state.trades) && !trades.length) trades = state.trades;
   if (state.activeWindow) switchWindow(state.activeWindow, false);
 }
 
@@ -858,21 +939,32 @@ function renderClearanceProfit(activeSymbol, positionEstimate, matchedProfit, op
   els.tFinalProfitHint.textContent = "已匹配盈亏 + 清仓匹配盈亏";
 }
 
-function loadTrades() {
+async function loadTrades() {
   try {
-    trades = JSON.parse(localStorage.getItem("gridTradingTrades") || "[]");
-  } catch {
+    const stored = await loadTradesFromDb();
+    if (Array.isArray(stored)) {
+      trades = stored;
+      return;
+    }
+  } catch (error) {
+    els.status.textContent = `IndexedDB 读取失败，尝试读取旧数据：${error?.message || error}`;
+  }
+  try {
+    const legacy = JSON.parse(localStorage.getItem("gridTradingTrades") || "[]");
+    if (Array.isArray(legacy) && legacy.length) {
+      trades = legacy;
+      await saveTradesToDb(trades);
+      localStorage.removeItem("gridTradingTrades");
+    }
+  } catch (error) {
     trades = [];
+    showStorageError(error, "读取");
   }
 }
 
 function saveTrades() {
   saveState();
-  try {
-    localStorage.removeItem("gridTradingTrades");
-  } catch {
-    // Old storage key cleanup is optional.
-  }
+  saveTradesToDb(trades).catch((error) => showStorageError(error, "保存"));
 }
 
 function addTrade() {
@@ -1581,13 +1673,34 @@ function exportBackup() {
 
 async function importBackup(file) {
   if (!file) return;
-  const payload = JSON.parse(await file.text());
-  if (!Array.isArray(payload.trades)) {
-    els.status.textContent = "备份文件不正确。";
+  let payload;
+  try {
+    els.status.textContent = `正在读取备份：${file.name}`;
+    payload = JSON.parse(await file.text());
+    if (!Array.isArray(payload.trades)) {
+      throw new Error("备份文件不正确。");
+    }
+    els.status.textContent = `正在导入备份：${payload.trades.length} 笔交易`;
+    trades = payload.trades;
+    await saveTradesToDb(trades);
+    const lightweightPayload = { ...payload };
+    delete lightweightPayload.trades;
+    const serialized = JSON.stringify(lightweightPayload);
+    localStorage.removeItem("gridTradingTrades");
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.setItem(STORAGE_KEY, serialized);
+    if (localStorage.getItem(STORAGE_KEY) !== serialized) {
+      throw new Error("备份导入校验失败。");
+    }
+  } catch (error) {
+    const message = error?.name === "QuotaExceededError"
+      ? "浏览器本地存储空间不足，备份没有导入。请先换用电脑浏览器或减少流水后再导入。"
+      : error?.message || "备份导入失败。";
+    els.status.textContent = message;
+    window.alert(message);
+    els.importBackup.value = "";
     return;
   }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  trades = payload.trades;
   restoreState();
   renderOriginalPositions();
   renderEquityEvents();
@@ -1596,7 +1709,8 @@ async function importBackup(file) {
   renderAllTrades();
   renderOverview();
   renderQuery();
-  saveTrades();
+  saveState();
+  els.importBackup.value = "";
   els.status.textContent = `已导入备份：${payload.name || file.name}`;
 }
 
@@ -1761,21 +1875,29 @@ els.applyTradeFilter?.addEventListener("click", () => {
   saveState();
 });
 els.exportBackup.addEventListener("click", exportBackup);
+els.importBackup.addEventListener("click", () => {
+  els.importBackup.value = "";
+});
 els.importBackup.addEventListener("change", () => importBackup(els.importBackup.files[0]).catch((err) => { els.status.textContent = err.message; }));
 els.clearTrades.addEventListener("click", clearTrades);
 
-grids = defaultGrids();
-ensureMatchedDetailModal();
-loadTrades();
-restoreState();
-if (!els.tDate.value) els.tDate.value = todayIso();
-if (!els.equityDate.value) els.equityDate.value = todayIso();
-autofillTradeName();
-renderOriginalPositions();
-renderEquityEvents();
-renderGrids();
-runScenarios();
-renderAllTrades();
-renderOverview();
-renderQuery();
-saveState();
+async function initializeApp() {
+  grids = defaultGrids();
+  ensureMatchedDetailModal();
+  await loadTrades();
+  restoreState();
+  await migrateLegacyTradeStorage();
+  if (!els.tDate.value) els.tDate.value = todayIso();
+  if (!els.equityDate.value) els.equityDate.value = todayIso();
+  autofillTradeName();
+  renderOriginalPositions();
+  renderEquityEvents();
+  renderGrids();
+  runScenarios();
+  renderAllTrades();
+  renderOverview();
+  renderQuery();
+  saveState();
+}
+
+initializeApp().catch((error) => showStorageError(error, "启动读取"));
