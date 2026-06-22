@@ -116,8 +116,11 @@ let matchedCalendarMonth = "";
 let matchedCalendarSelected = "";
 let saveTimer = 0;
 let flowFilterSymbol = "";
+let flowRenderLimit = 200;
 let symbolPickerMode = "query";
 const STORAGE_KEY = "gridTradingToolState";
+const FLOW_RENDER_STEP = 200;
+const IMPORT_CHUNK_SIZE = 500;
 const STOCK_NAME_MAP = {
   "000001": "平安银行",
   "000333": "美的集团",
@@ -808,15 +811,17 @@ function renderPositionEstimate(activeSymbol, openBuy, openSell, matchedProfit =
   els.tEstimatedShares.textContent = absShares;
   els.tEstimatedShares.className = estimated === 0 ? "profit-flat" : estimated > 0 ? "profit-positive" : "profit-negative";
   const hasKnownCost = pos.hasPosition && Number(pos.cost || 0) > 0;
-  const currentCost = hasKnownCost && estimated > 0 ? ((pos.cost * baseShares) + totalBuyAmount - totalSellAmount) / estimated : null;
-  const costChange = currentCost !== null ? currentCost - pos.cost : (estimated > 0 ? -matchedProfit / estimated : null);
+  const currentCost = estimated > 0
+    ? (hasKnownCost ? ((pos.cost * baseShares) + totalBuyAmount - totalSellAmount) / estimated : (totalBuyAmount - totalSellAmount) / estimated)
+    : null;
+  const costChange = currentCost !== null ? (hasKnownCost ? currentCost - pos.cost : currentCost) : null;
   if (isCleared) {
     els.tPositionStatus.textContent = hasKnownCost ? `已清仓 · 底仓成本 ${priceText(pos.cost)} · 变化 ${signedPriceText(costChange)}/股` : "已清仓 · 无底仓成本";
   } else if (estimated > 0) {
     if (currentCost !== null) {
       els.tPositionStatus.textContent = `现在成本 ${priceText(currentCost)} · 变化 ${signedPriceText(costChange)}/股`;
     } else {
-      els.tPositionStatus.textContent = `成本变化 ${signedPriceText(costChange)}/股 · -已匹配盈亏/现在股数`;
+      els.tPositionStatus.textContent = `现在成本 ${priceText(currentCost)} · 无底仓成本 · (总买入-总卖出)/现在股数`;
     }
   } else {
     els.tPositionStatus.textContent = hasKnownCost ? `净卖出 ${qty(Math.abs(estimated))} 股 · 底仓成本 ${priceText(pos.cost)}` : `净卖出 ${qty(Math.abs(estimated))} 股 · 无底仓成本`;
@@ -862,8 +867,12 @@ function loadTrades() {
 }
 
 function saveTrades() {
-  localStorage.setItem("gridTradingTrades", JSON.stringify(trades));
   saveState();
+  try {
+    localStorage.removeItem("gridTradingTrades");
+  } catch {
+    // Old storage key cleanup is optional.
+  }
 }
 
 function addTrade() {
@@ -1096,28 +1105,50 @@ function handleBrokerImportFile(file) {
   reader.readAsArrayBuffer(file);
 }
 
-function confirmBrokerImport() {
+function waitForUi() {
+  return new Promise((resolve) => window.setTimeout(resolve, 0));
+}
+
+async function appendTradesInChunks(rows) {
+  for (let i = 0; i < rows.length; i += IMPORT_CHUNK_SIZE) {
+    const chunk = rows.slice(i, i + IMPORT_CHUNK_SIZE);
+    chunk.forEach((trade) => trades.push(trade));
+    els.brokerImportStatus.textContent = `正在导入 ${Math.min(i + chunk.length, rows.length)} / ${rows.length} 笔，请稍等...`;
+    await waitForUi();
+  }
+}
+
+async function confirmBrokerImport() {
   if (!pendingBrokerTrades.length) return;
   if (!confirm(`确认导入 ${pendingBrokerTrades.length} 笔买卖成交吗？费用会按当前设置自动计算。`)) return;
-  trades.push(...pendingBrokerTrades);
+  const importCount = pendingBrokerTrades.length;
+  els.confirmBrokerImport.disabled = true;
+  await appendTradesInChunks(pendingBrokerTrades);
   saveTrades();
-  clearBrokerImportPreview();
+  pendingBrokerTrades = [];
+  els.brokerImportFile.value = "";
+  els.brokerImportStatus.textContent = `已导入 ${importCount} 笔成交。交易流水先显示最新 ${FLOW_RENDER_STEP} 笔，可继续加载更多。`;
+  renderBrokerImportPreview({ reason: "已完成导入" });
+  flowRenderLimit = FLOW_RENDER_STEP;
   renderAllTrades();
-  renderOverview();
-  renderQuery();
-  switchWindow("flowWindow");
+  switchWindow("flowWindow", false);
 }
 
 function renderAllTrades(editId = "") {
   renderFlowSymbolChoices();
   const visible = flowFilterSymbol ? trades.filter((t) => t.symbol === flowFilterSymbol) : trades;
   const sorted = [...visible].sort((a, b) => `${b.date}-${b.createdAt}`.localeCompare(`${a.date}-${a.createdAt}`));
-  els.tradeFlowRows.innerHTML = sorted.length ? sorted.map((t, i) => {
+  const rowsToRender = sorted.slice(0, flowRenderLimit);
+  const rowsHtml = rowsToRender.map((t, i) => {
     if (t.id === editId) {
       return `<tr data-id="${t.id}" class="edit-row">${cell("序号", i + 1, "seq-cell")}${cell("日期", `<input data-edit="date" type="date" value="${esc(t.date)}">`, "date-cell")}${cell("代码/名称", `<input data-edit="symbol" value="${esc(t.symbol)}"><input data-edit="name" value="${esc(tradeName(t))}" placeholder="名称">`, "symbol-cell")}${cell("方向", `<select data-edit="side"><option value="buy"${t.side === "buy" ? " selected" : ""}>买入</option><option value="sell"${t.side === "sell" ? " selected" : ""}>卖出</option></select>`, "side-cell")}${cell("价格", `<input data-edit="price" type="number" step="0.001" value="${t.price}">`, "price-cell")}${cell("股数", `<input data-edit="shares" type="number" step="100" value="${t.shares}">`, "shares-cell")}${cell("成交金额", money(t.amount), "amount-cell")}${cell("费用", `<input data-edit="fee" type="number" step="0.01" value="${t.fee}">`, "fee-cell")}${cell("操作", `<button data-action="save">保存</button><button data-action="cancel">取消</button>`, "action-cell")}</tr>`;
     }
     return `<tr data-id="${t.id}">${cell("序号", i + 1, "seq-cell")}${cell("日期", esc(t.date), "date-cell")}${cell("代码/名称", symbolNameHtml(t.symbol, tradeName(t)), "symbol-cell")}${cell("方向", t.side === "buy" ? "买入" : "卖出", "tag-cell side-cell")}${cell("价格", money(t.price), "price-cell")}${cell("股数", qty(t.shares), "shares-cell")}${cell("成交金额", money(t.amount), "amount-cell")}${cell("费用", money(t.fee), "fee-cell")}${cell("操作", `<button data-action="edit">编辑</button><button data-action="delete">删除</button>`, "action-cell")}</tr>`;
-  }).join("") : `<tr><td colspan="9" class="empty">${flowFilterSymbol ? `没有 ${esc(flowFilterSymbol)} 的交易流水。` : "还没有交易流水。"}</td></tr>`;
+  }).join("");
+  const moreHtml = sorted.length > rowsToRender.length
+    ? `<tr class="load-more-row"><td colspan="9"><button type="button" data-action="load-flow-more">显示更多 ${Math.min(FLOW_RENDER_STEP, sorted.length - rowsToRender.length)} 笔</button><span>已显示 ${rowsToRender.length} / ${sorted.length} 笔</span></td></tr>`
+    : "";
+  els.tradeFlowRows.innerHTML = sorted.length ? rowsHtml + moreHtml : `<tr><td colspan="9" class="empty">${flowFilterSymbol ? `没有 ${esc(flowFilterSymbol)} 的交易流水。` : "还没有交易流水。"}</td></tr>`;
 }
 
 function renderOverview() {
@@ -1579,7 +1610,13 @@ function clearTrades() {
   saveState();
 }
 
-els.tabs.forEach((tab) => tab.addEventListener("click", () => switchWindow(tab.dataset.window)));
+els.tabs.forEach((tab) => tab.addEventListener("click", () => {
+  const targetWindow = tab.dataset.window;
+  if (targetWindow === "flowWindow") renderAllTrades();
+  if (targetWindow === "overviewWindow") renderOverview();
+  if (targetWindow === "queryWindow") renderQuery();
+  switchWindow(targetWindow);
+}));
 els.scenarioTabs.forEach((tab) => tab.addEventListener("click", () => switchScenarioPane(tab.dataset.scenarioPane)));
 els.addGrid.addEventListener("click", () => addGrid());
 document.addEventListener("input", (event) => {
@@ -1636,6 +1673,11 @@ els.equityList.addEventListener("click", (event) => {
 els.tradeFlowRows.addEventListener("click", (event) => {
   const row = event.target.closest("tr");
   const action = event.target.dataset.action;
+  if (action === "load-flow-more") {
+    flowRenderLimit += FLOW_RENDER_STEP;
+    renderAllTrades();
+    return;
+  }
   if (!row || !action) return;
   if (action === "edit") renderAllTrades(row.dataset.id);
   if (action === "cancel") renderAllTrades();
@@ -1672,6 +1714,7 @@ els.symbolModal.addEventListener("click", (event) => {
   if (!button) return;
   if (symbolPickerMode === "flow") {
     flowFilterSymbol = button.dataset.symbol || "";
+    flowRenderLimit = FLOW_RENDER_STEP;
     renderAllTrades();
   } else {
     els.tFilterSymbol.value = button.dataset.symbol || "";

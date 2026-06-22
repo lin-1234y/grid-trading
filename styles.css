@@ -1652,6 +1652,28 @@ tbody tr:hover {
   background: linear-gradient(90deg, rgba(255, 48, 79, 0.10), rgba(255, 122, 24, 0.10), rgba(79, 140, 255, 0.10));
 }
 
+.load-more-row td {
+  text-align: center;
+  white-space: normal;
+  background: rgba(8, 13, 24, 0.94);
+}
+
+.load-more-row button {
+  min-height: 42px;
+  padding: 0 18px;
+  border-color: rgba(255, 209, 102, 0.42);
+  background: linear-gradient(135deg, #ff304f, #ff7a18 52%, #4f8cff);
+  color: #fff;
+  font-weight: 900;
+}
+
+.load-more-row span {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .warning-row {
   background: var(--danger-soft);
 }
