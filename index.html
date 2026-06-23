@@ -254,7 +254,7 @@
             <div class="quick-title">查询股票</div>
             <div class="all-profit-line">
               <span>所有股票匹配盈亏</span>
-              <strong id="allMatchedProfit">-</strong>
+              <button id="openAllProfitModal" class="profit-link" type="button"><strong id="allMatchedProfit">-</strong></button>
             </div>
             <div class="picker-row">
               <span id="currentQuerySymbol" class="current-symbol">全部股票</span>
@@ -308,6 +308,41 @@
       </section>
     </div>
 
+    <div id="allProfitModal" class="modal" hidden>
+      <div class="modal-backdrop" data-close-all-profit-modal></div>
+      <section class="modal-card all-profit-modal-card" role="dialog" aria-modal="true" aria-labelledby="allProfitModalTitle">
+        <div class="modal-title">
+          <h2 id="allProfitModalTitle">阶段股票匹配盈亏</h2>
+          <button id="closeAllProfitModal" class="icon-button" type="button">×</button>
+        </div>
+        <div id="allProfitModalSummary" class="all-profit-modal-summary"></div>
+        <div class="table-wrap tall">
+          <table>
+            <thead><tr><th>代码/名称</th><th>状态</th><th>匹配盈亏</th><th>匹配股数</th><th>成交金额</th><th>费用</th><th>交易次数</th></tr></thead>
+            <tbody id="allProfitModalRows"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <div id="clearedModal" class="modal" hidden>
+      <div class="modal-backdrop" data-close-cleared-modal></div>
+      <section class="modal-card cleared-modal-card" role="dialog" aria-modal="true" aria-labelledby="clearedModalTitle">
+        <div class="modal-title">
+          <h2 id="clearedModalTitle">清仓股票查询</h2>
+          <button id="closeClearedModal" class="icon-button" type="button">×</button>
+        </div>
+        <label class="field modal-search-field"><span>搜索代码或名称</span><input id="clearedSearchInput" placeholder="例如 600033 或 福建高速"></label>
+        <div id="clearedModalSummary" class="modal-small-summary"></div>
+        <div class="table-wrap tall">
+          <table>
+            <thead><tr><th>代码/名称</th><th>总盈亏</th><th>已匹配</th><th>总成交额</th><th>最后交易</th><th>操作</th></tr></thead>
+            <tbody id="clearedModalRows"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
     <template id="gridTemplate">
       <article class="grid-card">
         <div class="grid-card-head"><strong class="grid-title">网格</strong><button type="button" class="delete-grid">删除</button></div>
@@ -326,6 +361,6 @@
       </article>
     </template>
 
-    <script src="script.js?v=53"></script>
+    <script src="script.js?v=67"></script>
   </body>
 </html>

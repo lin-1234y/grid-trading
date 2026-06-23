@@ -71,6 +71,16 @@ const els = {
   applyTradeFilter: document.querySelector("#applyTradeFilterButton"),
   currentQuerySymbol: document.querySelector("#currentQuerySymbol"),
   allMatchedProfit: document.querySelector("#allMatchedProfit"),
+  openAllProfitModal: document.querySelector("#openAllProfitModal"),
+  allProfitModal: document.querySelector("#allProfitModal"),
+  closeAllProfitModal: document.querySelector("#closeAllProfitModal"),
+  allProfitModalSummary: document.querySelector("#allProfitModalSummary"),
+  allProfitModalRows: document.querySelector("#allProfitModalRows"),
+  clearedModal: document.querySelector("#clearedModal"),
+  closeClearedModal: document.querySelector("#closeClearedModal"),
+  clearedSearch: document.querySelector("#clearedSearchInput"),
+  clearedModalSummary: document.querySelector("#clearedModalSummary"),
+  clearedModalRows: document.querySelector("#clearedModalRows"),
   openQuerySymbolPicker: document.querySelector("#openQuerySymbolPicker"),
   symbolModal: document.querySelector("#symbolModal"),
   symbolModalTitle: document.querySelector("#symbolModalTitle"),
@@ -114,6 +124,8 @@ let equityEvents = [];
 let matchedCalendarRows = [];
 let matchedCalendarMonth = "";
 let matchedCalendarSelected = "";
+let matchedCalendarAggregateBySymbol = false;
+let overviewRowsCache = [];
 let saveTimer = 0;
 let flowFilterSymbol = "";
 let flowRenderLimit = 200;
@@ -175,12 +187,33 @@ function ensureMatchedDetailModal() {
             <div class="calendar-total-grid">
               <article><span>本月匹配盈亏</span><strong id="matchedMonthProfit">-</strong><em>成交金额 <b id="matchedMonthAmount">-</b></em></article>
               <article><span>本年匹配盈亏</span><strong id="matchedYearProfit">-</strong><em>成交金额 <b id="matchedYearAmount">-</b></em></article>
+              <article><span>全部匹配盈亏</span><strong id="matchedAllProfit">-</strong><em>成交金额 <b id="matchedAllAmount">-</b></em></article>
             </div>
           </div>
           <div class="table-wrap tall daily-match-detail">
             <table>
-              <thead><tr><th>卖出日期</th><th>卖价</th><th>买入日期</th><th>买价</th><th>股数</th><th>成交金额</th><th>费用</th><th>盈亏</th></tr></thead>
+              <thead id="matchedModalHead"><tr><th>卖出日期</th><th>卖价</th><th>买入日期</th><th>买价</th><th>股数</th><th>成交金额</th><th>费用</th><th>盈亏</th></tr></thead>
               <tbody id="matchedModalRows"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    `);
+  }
+  if (!document.querySelector("#calendarPeriodModal")) {
+    document.body.insertAdjacentHTML("beforeend", `
+      <div id="calendarPeriodModal" class="modal" hidden>
+        <div class="modal-backdrop" data-close-calendar-period-modal></div>
+        <section class="modal-card calendar-period-modal-card" role="dialog" aria-modal="true" aria-labelledby="calendarPeriodModalTitle">
+          <div class="modal-title">
+            <h2 id="calendarPeriodModalTitle">个股匹配盈亏</h2>
+            <button id="closeCalendarPeriodModal" class="icon-button" type="button">×</button>
+          </div>
+          <div id="calendarPeriodSummary" class="modal-small-summary"></div>
+          <div class="table-wrap tall">
+            <table>
+              <thead><tr><th>代码/名称</th><th>匹配盈亏</th><th>匹配股数</th><th>成交金额</th><th>费用</th><th>匹配组数</th></tr></thead>
+              <tbody id="calendarPeriodRows"></tbody>
             </table>
           </div>
         </section>
@@ -213,6 +246,10 @@ function qty(value) {
 
 function plainInteger(value) {
   return Number(value || 0).toLocaleString("zh-CN", { maximumFractionDigits: 0 });
+}
+
+function calendarInteger(value) {
+  return Math.round(Number(value || 0));
 }
 
 function fixed(value) {
@@ -1307,6 +1344,7 @@ function renderOverview() {
     symbolAsc: (a, b) => a.symbol.localeCompare(b.symbol),
   };
   rows.sort(sorters[sortMode] || sorters.lastDateDesc);
+  overviewRowsCache = rows;
   const sortLabel = els.overviewSort?.selectedOptions?.[0]?.textContent || "最近交易";
   const clearedCount = rows.filter((r) => r.isCleared).length;
   const openCount = rows.length - clearedCount;
@@ -1316,12 +1354,32 @@ function renderOverview() {
   if (els.overviewStats) {
     els.overviewStats.innerHTML = `
       <article><span>持仓股票</span><strong>${qty(openCount)}</strong></article>
-      <article><span>清仓股票</span><strong>${qty(clearedCount)}</strong></article>
+      <article><span>清仓股票</span><button id="openClearedModal" class="profit-link overview-count-link stat-view-link" type="button"><strong>${qty(clearedCount)}</strong><em>查看</em></button></article>
       <article><span>总盈亏</span><strong class="${profitClass(totalProfit)}">${money(totalProfit)}</strong></article>
-      <article><span>已匹配实现盈亏</span><strong class="${profitClass(matchedProfitTotal)}">${money(matchedProfitTotal)}</strong></article>
+      <article><span>已匹配实现盈亏</span><button id="openOverviewMatchedCalendar" class="profit-link overview-profit-link stat-view-link" type="button"><strong class="${profitClass(matchedProfitTotal)}">${money(matchedProfitTotal)}</strong><em>查看</em></button></article>
     `;
   }
   els.overviewRows.innerHTML = rows.length ? rows.map((r) => `<tr class="${r.isCleared ? "overview-cleared" : "overview-open"}">${cell("代码/名称", symbolNameHtml(r.symbol, r.name), "symbol-cell overview-symbol-cell")}${cell("状态", `<span class="status-pill ${r.isCleared ? "cleared" : "open"}">${r.status}</span>`)}${cell("总盈亏", money(r.totalProfit), profitClass(r.totalProfit))}${cell("已匹配", money(r.profit), profitClass(r.profit))}${cell("估算持仓", `${r.estimatedShares < 0 ? "-" : ""}${qty(Math.abs(r.estimatedShares))} 股`)}${cell("未匹配买入", `${qty(r.openBuy)} 股`)}${cell("未匹配卖出", `${qty(r.openSell)} 股`)}${cell("总成交额", money(r.amount))}${cell("操作", `<button data-action="view-symbol" data-symbol="${esc(r.symbol)}">查看</button>`, "action-cell")}</tr>`).join("") : `<tr><td colspan="9" class="empty">还没有交易流水。</td></tr>`;
+}
+
+function renderClearedModal() {
+  const keyword = (els.clearedSearch?.value || "").trim().toLowerCase();
+  const cleared = overviewRowsCache
+    .filter((row) => row.isCleared)
+    .filter((row) => !keyword || row.symbol.toLowerCase().includes(keyword) || String(row.name || "").toLowerCase().includes(keyword));
+  const allClearedCount = overviewRowsCache.filter((row) => row.isCleared).length;
+  const totalProfit = cleared.reduce((sum, row) => sum + row.totalProfit, 0);
+  els.clearedModalSummary.innerHTML = `清仓股票 ${cleared.length} / ${allClearedCount} 只 · 总盈亏 <strong class="${profitClass(totalProfit)}">${money(totalProfit)}</strong>`;
+  els.clearedModalRows.innerHTML = cleared.length ? cleared.map((row) => `
+    <tr class="overview-cleared">
+      ${cell("代码/名称", symbolNameHtml(row.symbol, row.name), "symbol-cell overview-symbol-cell")}
+      ${cell("总盈亏", money(row.totalProfit), profitClass(row.totalProfit))}
+      ${cell("已匹配", money(row.profit), profitClass(row.profit))}
+      ${cell("总成交额", money(row.amount), "amount-cell")}
+      ${cell("最后交易", esc(row.lastDate || "-"), "date-cell")}
+      ${cell("操作", `<button data-action="view-symbol" data-symbol="${esc(row.symbol)}">查看</button>`, "action-cell")}
+    </tr>
+  `).join("") : `<tr><td colspan="6" class="empty">没有找到符合条件的清仓股票。</td></tr>`;
 }
 
 function editTradeFromRow(row) {
@@ -1479,6 +1537,37 @@ function matchedEventDate(row) {
   return row.sellDate > row.buyDate ? row.sellDate : row.buyDate;
 }
 
+function allMatchedRows() {
+  const bySymbol = new Map();
+  trades.forEach((trade) => {
+    if (!trade.symbol) return;
+    if (!bySymbol.has(trade.symbol)) bySymbol.set(trade.symbol, []);
+    bySymbol.get(trade.symbol).push(trade);
+  });
+  return [...bySymbol.values()].flatMap((rows) => {
+    const sorted = [...rows].sort((a, b) => `${a.date}-${a.createdAt || 0}`.localeCompare(`${b.date}-${b.createdAt || 0}`));
+    return matchTrades(sorted, todayIso()).matched;
+  });
+}
+
+function allMatchedRowsForSymbol(symbol) {
+  const code = normalizeSymbol(symbol);
+  if (!code) return allMatchedRows();
+  const rows = trades
+    .filter((trade) => trade.symbol === code)
+    .sort((a, b) => `${a.date}-${a.createdAt || 0}`.localeCompare(`${b.date}-${b.createdAt || 0}`));
+  return matchTrades(rows, todayIso()).matched;
+}
+
+function isWithinDateRange(date, start, end) {
+  return (!start || date >= start) && (!end || date <= end);
+}
+
+function periodMatchedRows(start = "", end = "") {
+  return allMatchedRows()
+    .filter((row) => isWithinDateRange(matchedEventDate(row), start, end));
+}
+
 function monthKey(date) {
   return String(date || "").slice(0, 7);
 }
@@ -1498,19 +1587,113 @@ function renderDailyMatchedRows(rows) {
   return rows.map((r) => `<tr>${cell("卖出日期", esc(r.sellDate), "sell-date-cell")}${cell("卖价", money(r.sellPrice), "sell-price-cell")}${cell("买入日期", esc(r.buyDate), "buy-date-cell")}${cell("买价", money(r.buyPrice), "buy-price-cell")}${cell("股数", qty(r.shares), "shares-cell")}${cell("成交金额", money(r.amount), "amount-cell")}${cell("费用", money(r.fee), "fee-cell")}${cell("盈亏", money(r.profit), `${profitClass(r.profit)} profit-cell`)}</tr>`).join("");
 }
 
-function renderMatchedCalendar(matched) {
+function renderDailySymbolProfitRows(rows) {
+  if (!rows.length) return `<tr><td colspan="6" class="empty">当天没有匹配盈亏。</td></tr>`;
+  const bySymbol = new Map();
+  rows.forEach((row) => {
+    const item = bySymbol.get(row.symbol) || {
+      symbol: row.symbol,
+      name: row.name || stockNameForSymbol(row.symbol),
+      profit: 0,
+      shares: 0,
+      amount: 0,
+      fee: 0,
+      count: 0,
+    };
+    if (!item.name && row.name) item.name = row.name;
+    item.profit += Number(row.profit || 0);
+    item.shares += Number(row.shares || 0);
+    item.amount += Number(row.amount || 0);
+    item.fee += Number(row.fee || 0);
+    item.count += 1;
+    bySymbol.set(row.symbol, item);
+  });
+  return [...bySymbol.values()]
+    .sort((a, b) => Math.abs(b.profit) - Math.abs(a.profit) || a.symbol.localeCompare(b.symbol))
+    .map((row) => `<tr>${cell("代码/名称", symbolNameHtml(row.symbol, row.name), "symbol-cell")}${cell("匹配盈亏", `<strong class="${profitClass(row.profit)}">${money(row.profit)}</strong>`, "profit-cell")}${cell("匹配股数", `${qty(row.shares)} 股`, "shares-cell")}${cell("成交金额", money(row.amount), "amount-cell")}${cell("费用", money(row.fee), "fee-cell")}${cell("匹配组数", `${row.count} 组`, "count-cell")}</tr>`)
+    .join("");
+}
+
+function openCalendarPeriodModal(period) {
+  if (!matchedCalendarMonth || !matchedCalendarRows.length) return;
+  const year = matchedCalendarMonth.slice(0, 4);
+  const isMonth = period === "month";
+  const label = isMonth ? matchedCalendarMonth : `${year}年`;
+  const rows = matchedCalendarRows.filter((row) => {
+    const date = matchedEventDate(row);
+    return isMonth ? monthKey(date) === matchedCalendarMonth : date.startsWith(`${year}-`);
+  });
+  const profit = rows.reduce((sum, row) => sum + Number(row.profit || 0), 0);
+  const amount = rows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  const fee = rows.reduce((sum, row) => sum + Number(row.fee || 0), 0);
+  const symbols = new Set(rows.map((row) => row.symbol).filter(Boolean));
+  const modal = document.querySelector("#calendarPeriodModal");
+  const title = document.querySelector("#calendarPeriodModalTitle");
+  const summary = document.querySelector("#calendarPeriodSummary");
+  const body = document.querySelector("#calendarPeriodRows");
+  if (!modal || !title || !summary || !body) return;
+  title.textContent = `${label}个股匹配盈亏`;
+  summary.innerHTML = `${symbols.size} 只股票 · ${rows.length} 组匹配 · 盈亏 <strong class="${profitClass(profit)}">${money(profit)}</strong> · 成交金额 ${money(amount)} · 费用 ${money(fee)}`;
+  body.innerHTML = renderDailySymbolProfitRows(rows);
+  modal.hidden = false;
+}
+
+function setMatchedModalDetailMode(summaryMode) {
+  const head = document.querySelector("#matchedModalHead");
+  if (!head) return;
+  head.innerHTML = summaryMode
+    ? `<tr><th>代码/名称</th><th>匹配盈亏</th><th>匹配股数</th><th>成交金额</th><th>费用</th><th>匹配组数</th></tr>`
+    : `<tr><th>卖出日期</th><th>卖价</th><th>买入日期</th><th>买价</th><th>股数</th><th>成交金额</th><th>费用</th><th>盈亏</th></tr>`;
+}
+
+function calendarDailyTotals(rows, aggregateBySymbol = false) {
+  const byDate = new Map();
+  if (aggregateBySymbol) {
+    const byDateSymbol = new Map();
+    rows.forEach((row) => {
+      const date = matchedEventDate(row);
+      const key = `${date}|${row.symbol || ""}`;
+      const item = byDateSymbol.get(key) || { date, profit: 0, amount: 0, count: 0 };
+      item.profit += row.profit;
+      item.amount += row.amount;
+      item.count += 1;
+      byDateSymbol.set(key, item);
+    });
+    byDateSymbol.forEach((item) => {
+      const day = byDate.get(item.date) || { profit: 0, amount: 0, count: 0 };
+      day.profit += calendarInteger(item.profit);
+      day.amount += calendarInteger(item.amount);
+      day.count += item.count;
+      byDate.set(item.date, day);
+    });
+    return byDate;
+  }
+  rows.forEach((row) => {
+    const date = matchedEventDate(row);
+    const item = byDate.get(date) || { profit: 0, amount: 0, count: 0 };
+    item.profit += row.profit;
+    item.amount += row.amount;
+    item.count += 1;
+    byDate.set(date, item);
+  });
+  return byDate;
+}
+
+function renderMatchedCalendar(matched, options = {}) {
+  matchedCalendarAggregateBySymbol = Boolean(options.aggregateBySymbol);
   matchedCalendarRows = [...matched].sort((a, b) => matchedEventDate(b).localeCompare(matchedEventDate(a)));
   const grid = document.querySelector("#matchedCalendarGrid");
   const title = document.querySelector("#matchedCalendarTitle");
   const modalRows = document.querySelector("#matchedModalRows");
   if (!grid || !title || !modalRows) return;
+  setMatchedModalDetailMode(matchedCalendarAggregateBySymbol);
   if (!matchedCalendarRows.length) {
     matchedCalendarMonth = "";
     matchedCalendarSelected = "";
     title.textContent = "-";
     grid.innerHTML = `<div class="calendar-empty">还没有已匹配记录。</div>`;
-    modalRows.innerHTML = `<tr><td colspan="8" class="empty">还没有可匹配的反向交易。</td></tr>`;
-    ["matchedMonthProfit", "matchedMonthAmount", "matchedYearProfit", "matchedYearAmount"].forEach((id) => {
+    modalRows.innerHTML = `<tr><td colspan="${matchedCalendarAggregateBySymbol ? 6 : 8}" class="empty">还没有可匹配的反向交易。</td></tr>`;
+    ["matchedMonthProfit", "matchedMonthAmount", "matchedYearProfit", "matchedYearAmount", "matchedAllProfit", "matchedAllAmount"].forEach((id) => {
       const node = document.querySelector(`#${id}`);
       if (node) node.textContent = "-";
     });
@@ -1526,15 +1709,7 @@ function renderMatchedCalendar(matched) {
   const daysInMonth = new Date(year, month, 0).getDate();
   const firstWeekday = (new Date(year, month - 1, 1).getDay() + 6) % 7;
   const offset = Math.min(firstWeekday, 5);
-  const byDate = new Map();
-  matchedCalendarRows.forEach((row) => {
-    const date = matchedEventDate(row);
-    const item = byDate.get(date) || { profit: 0, amount: 0, count: 0 };
-    item.profit += row.profit;
-    item.amount += row.amount;
-    item.count += 1;
-    byDate.set(date, item);
-  });
+  const byDate = calendarDailyTotals(matchedCalendarRows, matchedCalendarAggregateBySymbol);
   const cells = Array.from({ length: offset }, () => `<div class="calendar-day muted"></div>`);
   for (let day = 1; day <= daysInMonth; day += 1) {
     const date = `${matchedCalendarMonth}-${String(day).padStart(2, "0")}`;
@@ -1551,13 +1726,19 @@ function renderMatchedCalendar(matched) {
   const monthAmount = monthRows.reduce((sum, row) => sum + row.amount, 0);
   const yearProfit = yearRows.reduce((sum, row) => sum + row.profit, 0);
   const yearAmount = yearRows.reduce((sum, row) => sum + row.amount, 0);
+  const allProfit = matchedCalendarRows.reduce((sum, row) => sum + row.profit, 0);
+  const allAmount = matchedCalendarRows.reduce((sum, row) => sum + row.amount, 0);
   document.querySelector("#matchedMonthProfit").textContent = money(monthProfit);
   document.querySelector("#matchedMonthProfit").className = profitClass(monthProfit);
   document.querySelector("#matchedMonthAmount").textContent = money(monthAmount);
   document.querySelector("#matchedYearProfit").textContent = money(yearProfit);
   document.querySelector("#matchedYearProfit").className = profitClass(yearProfit);
   document.querySelector("#matchedYearAmount").textContent = money(yearAmount);
-  modalRows.innerHTML = renderDailyMatchedRows(matchedDayRows(matchedCalendarSelected));
+  document.querySelector("#matchedAllProfit").textContent = money(allProfit);
+  document.querySelector("#matchedAllProfit").className = profitClass(allProfit);
+  document.querySelector("#matchedAllAmount").textContent = money(allAmount);
+  const selectedRows = matchedDayRows(matchedCalendarSelected);
+  modalRows.innerHTML = matchedCalendarAggregateBySymbol ? renderDailySymbolProfitRows(selectedRows) : renderDailyMatchedRows(selectedRows);
 }
 
 function renderMatchedDetailRows(matched) {
@@ -1613,6 +1794,82 @@ function renderUnmatchedGroups(unmatched) {
   return `<tr class="unmatched-group-row"><td colspan="8">${renderSide("buy", "未匹配买入", "buy")}${renderSide("sell", "未匹配卖出", "sell")}</td></tr>`;
 }
 
+function symbolPositionStatus(symbol, throughDate = todayIso()) {
+  const rows = trades
+    .filter((trade) => trade.symbol === symbol)
+    .filter((trade) => trade.date <= throughDate)
+    .sort((a, b) => `${a.date}-${a.createdAt}`.localeCompare(`${b.date}-${b.createdAt}`));
+  const { unmatched } = matchTrades(rows, throughDate);
+  const openBuy = unmatched.filter((r) => r.side === "buy").reduce((sum, r) => sum + r.remaining, 0);
+  const openSell = unmatched.filter((r) => r.side === "sell").reduce((sum, r) => sum + r.remaining, 0);
+  const pos = adjustedOriginalPosition(symbol, throughDate);
+  const baseShares = Number(pos?.shares || 0);
+  const estimatedShares = baseShares + openBuy - openSell;
+  const isCleared = pos.hasPosition ? (openSell === baseShares && openBuy === 0) : estimatedShares === 0;
+  return {
+    isCleared,
+    estimatedShares,
+    label: isCleared ? "清仓" : "持仓",
+  };
+}
+
+function buildAllProfitRows() {
+  const start = els.tStartDate.value;
+  const end = els.tEndDate.value;
+  const throughDate = end || todayIso();
+  const matched = periodMatchedRows(start, end);
+  const bySymbol = new Map();
+  matched.forEach((row) => {
+    const item = bySymbol.get(row.symbol) || {
+      symbol: row.symbol,
+      name: row.name || stockNameForSymbol(row.symbol),
+      profit: 0,
+      shares: 0,
+      amount: 0,
+      fee: 0,
+      count: 0,
+    };
+    if (!item.name && row.name) item.name = row.name;
+    item.profit += Number(row.profit || 0);
+    item.shares += Number(row.shares || 0);
+    item.amount += Number(row.amount || 0);
+    item.fee += Number(row.fee || 0);
+    item.count += 1;
+    bySymbol.set(row.symbol, item);
+  });
+  return [...bySymbol.values()]
+    .map((row) => ({ ...row, position: symbolPositionStatus(row.symbol, throughDate) }))
+    .sort((a, b) => Math.abs(b.profit) - Math.abs(a.profit) || a.symbol.localeCompare(b.symbol));
+}
+
+function renderAllProfitModal() {
+  const rows = buildAllProfitRows();
+  const totalProfit = rows.reduce((sum, row) => sum + row.profit, 0);
+  const totalAmount = rows.reduce((sum, row) => sum + row.amount, 0);
+  const totalFee = rows.reduce((sum, row) => sum + row.fee, 0);
+  const start = els.tStartDate.value || "全部";
+  const end = els.tEndDate.value || "今天";
+  els.allProfitModalSummary.innerHTML = [
+    ["日期阶段", `${start} - ${end}`],
+    ["股票数量", `${rows.length} 只`],
+    ["阶段盈亏", money(totalProfit)],
+    ["成交金额", money(totalAmount)],
+    ["总费用", money(totalFee)],
+    ["匹配次数", `${rows.reduce((sum, row) => sum + row.count, 0)} 组`],
+  ].map(([label, value]) => `<article><span>${label}</span><strong class="${label.includes("盈亏") ? profitClass(totalProfit) : ""}">${value}</strong></article>`).join("");
+  els.allProfitModalRows.innerHTML = rows.length ? rows.map((row) => `
+    <tr>
+      ${cell("代码/名称", symbolNameHtml(row.symbol, row.name), "symbol-cell")}
+      ${cell("状态", `<span class="status-pill ${row.position.isCleared ? "cleared" : ""}">${row.position.label}</span><small>${qty(Math.abs(row.position.estimatedShares))} 股</small>`, "tag-cell")}
+      ${cell("匹配盈亏", `<strong class="${profitClass(row.profit)}">${money(row.profit)}</strong>`, "profit-cell")}
+      ${cell("匹配股数", `${qty(row.shares)} 股`, "shares-cell")}
+      ${cell("成交金额", money(row.amount), "amount-cell")}
+      ${cell("费用", money(row.fee), "fee-cell")}
+      ${cell("交易次数", `${row.count} 组`, "count-cell")}
+    </tr>
+  `).join("") : `<tr><td colspan="7" class="empty">这个日期阶段还没有匹配盈亏。</td></tr>`;
+}
+
 function renderQuery() {
   renderSymbolChoices();
   const activeSymbol = normalizeSymbol(els.tFilterSymbol.value);
@@ -1620,13 +1877,15 @@ function renderQuery() {
   const start = els.tStartDate.value;
   const end = els.tEndDate.value;
   const throughDate = els.tEndDate.value || todayIso();
-  const periodTrades = trades
-    .filter((t) => !start || t.date >= start)
-    .filter((t) => !end || t.date <= end)
+  const positionRows = trades
+    .filter((trade) => !activeSymbol || trade.symbol === activeSymbol)
+    .filter((trade) => trade.date <= throughDate)
     .sort((a, b) => `${a.date}-${a.createdAt}`.localeCompare(`${b.date}-${b.createdAt}`));
-  const allMatched = matchTrades(periodTrades, throughDate).matched;
+  const allMatched = periodMatchedRows(start, end);
   const allProfit = allMatched.reduce((sum, r) => sum + r.profit, 0);
-  const { matched, unmatched } = matchTrades(rows, throughDate);
+  const matched = allMatchedRowsForSymbol(activeSymbol)
+    .filter((row) => isWithinDateRange(matchedEventDate(row), start, end));
+  const { unmatched } = matchTrades(positionRows, throughDate);
   const profit = matched.reduce((sum, r) => sum + r.profit, 0);
   const totalFees = rows.reduce((sum, r) => sum + Number(r.fee || 0), 0);
   const totalAmount = rows.reduce((sum, r) => sum + Number(r.amount || r.price * r.shares || 0), 0);
@@ -1635,8 +1894,8 @@ function renderQuery() {
   const openSell = unmatched.filter((r) => r.side === "sell").reduce((sum, r) => sum + r.remaining, 0);
   const openBuyAmount = unmatched.filter((r) => r.side === "buy").reduce((sum, r) => sum + r.remaining * r.price, 0);
   const openSellAmount = unmatched.filter((r) => r.side === "sell").reduce((sum, r) => sum + r.remaining * r.price, 0);
-  const totalBuyAmount = rows.filter((r) => r.side === "buy").reduce((sum, r) => sum + Number(r.amount || r.price * r.shares || 0), 0);
-  const totalSellAmount = rows.filter((r) => r.side === "sell").reduce((sum, r) => sum + Number(r.amount || r.price * r.shares || 0), 0);
+  const totalBuyAmount = positionRows.filter((r) => r.side === "buy").reduce((sum, r) => sum + Number(r.amount || r.price * r.shares || 0), 0);
+  const totalSellAmount = positionRows.filter((r) => r.side === "sell").reduce((sum, r) => sum + Number(r.amount || r.price * r.shares || 0), 0);
   els.allMatchedProfit.textContent = money(allProfit);
   els.allMatchedProfit.className = profitClass(allProfit);
   els.tMatchedProfit.textContent = money(profit);
@@ -1654,8 +1913,6 @@ function renderQuery() {
   els.unmatchedSummary.textContent = `${unmatched.length} 条未匹配`;
   const matchedHtml = renderMatchedDetailRows(matched);
   els.matchedRows.innerHTML = matchedHtml;
-  const matchedModalRows = document.querySelector("#matchedModalRows");
-  if (matchedModalRows) renderMatchedCalendar(matched);
   els.unmatchedRows.innerHTML = renderUnmatchedGroups(unmatched);
 }
 
@@ -1804,13 +2061,17 @@ els.tradeFlowRows.addEventListener("click", (event) => {
     renderQuery();
   }
 });
-els.overviewRows.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-action='view-symbol']");
-  if (!button) return;
-  els.tFilterSymbol.value = button.dataset.symbol || "";
+function viewSymbolDetail(symbol) {
+  els.tFilterSymbol.value = symbol || "";
   renderQuery();
   switchWindow("queryWindow");
   saveState();
+}
+
+els.overviewRows.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-action='view-symbol']");
+  if (!button) return;
+  viewSymbolDetail(button.dataset.symbol || "");
 });
 els.overviewSort?.addEventListener("change", renderOverview);
 document.querySelector("#overviewWindow thead")?.addEventListener("click", (event) => {
@@ -1838,42 +2099,90 @@ els.symbolModal.addEventListener("click", (event) => {
   saveState();
 });
 document.addEventListener("click", (event) => {
+  const viewButton = event.target.closest("#clearedModal [data-action='view-symbol']");
+  if (viewButton) {
+    els.clearedModal.hidden = true;
+    viewSymbolDetail(viewButton.dataset.symbol || "");
+  }
+  if (event.target.closest("#openClearedModal")) {
+    if (!overviewRowsCache.length && trades.length) renderOverview();
+    if (els.clearedSearch) els.clearedSearch.value = "";
+    renderClearedModal();
+    els.clearedModal.hidden = false;
+  }
+  if (event.target.closest("#closeClearedModal") || event.target.matches("[data-close-cleared-modal]")) {
+    els.clearedModal.hidden = true;
+  }
+  if (event.target.closest(".all-profit-line")) {
+    renderAllProfitModal();
+    els.allProfitModal.hidden = false;
+  }
+  if (event.target.closest("#closeAllProfitModal") || event.target.matches("[data-close-all-profit-modal]")) {
+    els.allProfitModal.hidden = true;
+  }
   if (event.target.closest("#openMatchedModal")) {
-    renderMatchedCalendar(matchedCalendarRows);
+    const activeSymbol = normalizeSymbol(els.tFilterSymbol.value);
+    matchedCalendarMonth = "";
+    matchedCalendarSelected = "";
+    renderMatchedCalendar(allMatchedRowsForSymbol(activeSymbol), { aggregateBySymbol: !activeSymbol });
+    const title = document.querySelector("#matchedModalTitle");
+    if (title) title.textContent = activeSymbol ? "已匹配细节" : "全部股票已匹配日历";
+    document.querySelector("#matchedModal").hidden = false;
+  }
+  if (event.target.closest("#openOverviewMatchedCalendar")) {
+    matchedCalendarMonth = "";
+    matchedCalendarSelected = "";
+    renderMatchedCalendar(allMatchedRows(), { aggregateBySymbol: true });
+    const title = document.querySelector("#matchedModalTitle");
+    if (title) title.textContent = "全部股票已匹配日历";
     document.querySelector("#matchedModal").hidden = false;
   }
   if (event.target.closest("#closeMatchedModal") || event.target.matches("[data-close-matched-modal]")) {
     document.querySelector("#matchedModal").hidden = true;
   }
+  const calendarTotalCard = event.target.closest(".calendar-total-grid article");
+  if (calendarTotalCard?.querySelector("#matchedMonthProfit")) {
+    openCalendarPeriodModal("month");
+  }
+  if (calendarTotalCard?.querySelector("#matchedYearProfit")) {
+    openCalendarPeriodModal("year");
+  }
+  if (event.target.closest("#closeCalendarPeriodModal") || event.target.matches("[data-close-calendar-period-modal]")) {
+    document.querySelector("#calendarPeriodModal").hidden = true;
+  }
   const dayButton = event.target.closest(".calendar-day[data-date]");
   if (dayButton) {
     matchedCalendarSelected = dayButton.dataset.date;
     matchedCalendarMonth = monthKey(matchedCalendarSelected);
-    renderMatchedCalendar(matchedCalendarRows);
+    renderMatchedCalendar(matchedCalendarRows, { aggregateBySymbol: matchedCalendarAggregateBySymbol });
   }
   if (event.target.closest("#matchedCalendarPrev") && matchedCalendarMonth) {
     matchedCalendarMonth = shiftMonth(matchedCalendarMonth, -1);
     matchedCalendarSelected = "";
-    renderMatchedCalendar(matchedCalendarRows);
+    renderMatchedCalendar(matchedCalendarRows, { aggregateBySymbol: matchedCalendarAggregateBySymbol });
   }
   if (event.target.closest("#matchedCalendarNext") && matchedCalendarMonth) {
     matchedCalendarMonth = shiftMonth(matchedCalendarMonth, 1);
     matchedCalendarSelected = "";
-    renderMatchedCalendar(matchedCalendarRows);
+    renderMatchedCalendar(matchedCalendarRows, { aggregateBySymbol: matchedCalendarAggregateBySymbol });
   }
 });
 els.tStartDate.addEventListener("change", () => {
   renderQuery();
+  if (!els.allProfitModal?.hidden) renderAllProfitModal();
   saveState();
 });
 els.tEndDate.addEventListener("change", () => {
   renderQuery();
+  if (!els.allProfitModal?.hidden) renderAllProfitModal();
   saveState();
 });
 els.applyTradeFilter?.addEventListener("click", () => {
   renderQuery();
+  if (!els.allProfitModal?.hidden) renderAllProfitModal();
   saveState();
 });
+els.clearedSearch?.addEventListener("input", renderClearedModal);
 els.exportBackup.addEventListener("click", exportBackup);
 els.importBackup.addEventListener("click", () => {
   els.importBackup.value = "";
