@@ -1272,7 +1272,7 @@ function renderAllTrades(editId = "") {
     if (t.id === editId) {
       return `<tr data-id="${t.id}" class="edit-row">${cell("序号", i + 1, "seq-cell")}${cell("日期", `<input data-edit="date" type="date" value="${esc(t.date)}">`, "date-cell")}${cell("代码/名称", `<input data-edit="symbol" value="${esc(t.symbol)}"><input data-edit="name" value="${esc(tradeName(t))}" placeholder="名称">`, "symbol-cell")}${cell("方向", `<select data-edit="side"><option value="buy"${t.side === "buy" ? " selected" : ""}>买入</option><option value="sell"${t.side === "sell" ? " selected" : ""}>卖出</option></select>`, "side-cell")}${cell("价格", `<input data-edit="price" type="number" step="0.001" value="${t.price}">`, "price-cell")}${cell("股数", `<input data-edit="shares" type="number" step="100" value="${t.shares}">`, "shares-cell")}${cell("成交金额", money(t.amount), "amount-cell")}${cell("费用", `<input data-edit="fee" type="number" step="0.01" value="${t.fee}">`, "fee-cell")}${cell("操作", `<button data-action="save">保存</button><button data-action="cancel">取消</button>`, "action-cell")}</tr>`;
     }
-    return `<tr data-id="${t.id}">${cell("序号", i + 1, "seq-cell")}${cell("日期", esc(t.date), "date-cell")}${cell("代码/名称", symbolNameHtml(t.symbol, tradeName(t)), "symbol-cell")}${cell("方向", t.side === "buy" ? "买入" : "卖出", "tag-cell side-cell")}${cell("价格", money(t.price), "price-cell")}${cell("股数", qty(t.shares), "shares-cell")}${cell("成交金额", money(t.amount), "amount-cell")}${cell("费用", money(t.fee), "fee-cell")}${cell("操作", `<button data-action="edit">编辑</button><button data-action="delete">删除</button>`, "action-cell")}</tr>`;
+    return `<tr data-id="${t.id}">${cell("序号", i + 1, "seq-cell")}${cell("日期", esc(t.date), "date-cell")}${cell("代码/名称", symbolNameHtml(t.symbol, tradeName(t)), "symbol-cell")}${cell("方向", t.side === "buy" ? "买入" : "卖出", `tag-cell side-cell side-${t.side}`)}${cell("价格", money(t.price), "price-cell")}${cell("股数", qty(t.shares), "shares-cell")}${cell("成交金额", money(t.amount), "amount-cell")}${cell("费用", money(t.fee), "fee-cell")}${cell("操作", `<button data-action="edit">编辑</button><button data-action="delete">删除</button>`, "action-cell")}</tr>`;
   }).join("");
   const moreHtml = sorted.length > rowsToRender.length
     ? `<tr class="load-more-row"><td colspan="9"><button type="button" data-action="load-flow-more">显示更多 ${Math.min(FLOW_RENDER_STEP, sorted.length - rowsToRender.length)} 笔</button><span>已显示 ${rowsToRender.length} / ${sorted.length} 笔</span></td></tr>`
@@ -1863,7 +1863,7 @@ function renderAllProfitModal() {
     <tr>
       ${cell("代码/名称", symbolNameHtml(row.symbol, row.name), "symbol-cell")}
       ${cell("状态", `<span class="status-pill ${row.position.isCleared ? "cleared" : ""}">${row.position.label}</span><small>${qty(Math.abs(row.position.estimatedShares))} 股</small>`, "tag-cell")}
-      ${cell("匹配盈亏", `<strong class="${profitClass(row.profit)}">${money(row.profit)}</strong>`, "profit-cell")}
+      ${cell("匹配盈亏", `<strong class="${profitClass(row.profit)}">${plainInteger(row.profit)}</strong>`, "profit-cell")}
       ${cell("匹配股数", `${qty(row.shares)} 股`, "shares-cell")}
       ${cell("成交金额", money(row.amount), "amount-cell")}
       ${cell("费用", money(row.fee), "fee-cell")}

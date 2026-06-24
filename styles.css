@@ -608,6 +608,15 @@ p {
   background: rgba(15, 159, 143, 0.16);
 }
 
+.metric strong.profit-positive {
+  color: #ff5c6b;
+  background: linear-gradient(135deg, #071426, #0b2744);
+}
+
+.metric strong.profit-negative {
+  color: #34f5c5;
+}
+
 .stage-summary-row {
   background:
     linear-gradient(135deg, rgba(255, 209, 102, 0.14), rgba(52, 245, 197, 0.08), rgba(15, 23, 42, 0.96)) !important;
@@ -652,6 +661,17 @@ p {
   background: linear-gradient(135deg, rgba(34, 211, 238, 0.16), rgba(155, 108, 255, 0.14));
   color: #67e8f9;
   font-weight: 850;
+}
+
+#tradeFlowRows .side-cell.side-buy {
+  border-color: rgba(255, 92, 107, 0.52);
+  background: linear-gradient(135deg, #071426, #0b2744);
+  color: #ff5c6b;
+  text-shadow: 0 0 8px rgba(255, 92, 107, 0.38);
+}
+
+#tradeFlowRows .side-cell.side-sell {
+  color: #67e8f9;
 }
 
 .scenario-grid {
@@ -1299,6 +1319,9 @@ p {
   padding: 6px 9px;
   border-radius: 6px;
   background: linear-gradient(135deg, #071426, #0b2744);
+  font-family: var(--font-number);
+  font-size: 19px;
+  line-height: 1.1;
 }
 
 .modal-search-field {
