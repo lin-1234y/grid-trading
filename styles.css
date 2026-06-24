@@ -598,7 +598,7 @@ p {
   color: #ff5c6b;
   font-weight: 850;
   border-radius: 6px;
-  background: rgba(216, 59, 99, 0.18);
+  background: linear-gradient(135deg, #071426, #0b2744);
 }
 
 .profit-negative {
@@ -1298,7 +1298,7 @@ p {
   min-width: 92px;
   padding: 6px 9px;
   border-radius: 6px;
-  background: rgba(255, 48, 79, 0.18);
+  background: linear-gradient(135deg, #071426, #0b2744);
 }
 
 .modal-search-field {
@@ -1412,8 +1412,8 @@ p {
 }
 
 .calendar-day.has-match {
-  border-color: rgba(255, 77, 95, 0.30);
-  background: linear-gradient(135deg, rgba(10, 16, 30, 0.98), rgba(26, 31, 56, 0.94), rgba(62, 36, 70, 0.42));
+  border-color: rgba(76, 154, 255, 0.42);
+  background: linear-gradient(145deg, #07111f, #0b2038 58%, #102944);
 }
 
 .calendar-day.active {
@@ -1438,14 +1438,22 @@ p {
 }
 
 .calendar-day strong {
-  font-size: 15px;
+  padding: 2px 3px;
+  font-size: 17px;
   font-weight: 950;
+  background: rgba(3, 12, 25, 0.72);
+  text-shadow: 0 0 10px currentColor;
 }
 
 .calendar-day em {
-  color: #8fb8ff;
-  font-size: 10px;
+  color: #a9ccff;
+  font-size: 11px;
   font-weight: 800;
+}
+
+.calendar-day strong.profit-positive,
+.calendar-day strong.profit-negative {
+  background: rgba(3, 12, 25, 0.72);
 }
 
 .calendar-total-grid {
@@ -1960,11 +1968,11 @@ tbody tr:hover {
 
   .calendar-day strong,
   .calendar-day em {
-    font-size: 9px;
+    font-size: 11px;
   }
 
   .calendar-day strong {
-    font-size: 13px;
+    font-size: 16px;
   }
 
   .calendar-total-grid {

@@ -1618,9 +1618,11 @@ function openCalendarPeriodModal(period) {
   if (!matchedCalendarMonth || !matchedCalendarRows.length) return;
   const year = matchedCalendarMonth.slice(0, 4);
   const isMonth = period === "month";
-  const label = isMonth ? matchedCalendarMonth : `${year}年`;
+  const isDay = period === "day";
+  const label = isDay ? matchedCalendarSelected : isMonth ? matchedCalendarMonth : `${year}年`;
   const rows = matchedCalendarRows.filter((row) => {
     const date = matchedEventDate(row);
+    if (isDay) return date === matchedCalendarSelected;
     return isMonth ? monthKey(date) === matchedCalendarMonth : date.startsWith(`${year}-`);
   });
   const profit = rows.reduce((sum, row) => sum + Number(row.profit || 0), 0);
@@ -2155,6 +2157,7 @@ document.addEventListener("click", (event) => {
     matchedCalendarSelected = dayButton.dataset.date;
     matchedCalendarMonth = monthKey(matchedCalendarSelected);
     renderMatchedCalendar(matchedCalendarRows, { aggregateBySymbol: matchedCalendarAggregateBySymbol });
+    openCalendarPeriodModal("day");
   }
   if (event.target.closest("#matchedCalendarPrev") && matchedCalendarMonth) {
     matchedCalendarMonth = shiftMonth(matchedCalendarMonth, -1);
