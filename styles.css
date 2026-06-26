@@ -1527,6 +1527,32 @@ p {
   font-size: 18px;
 }
 
+.calendar-title-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.calendar-year-select {
+  min-height: 32px;
+  width: 92px;
+  padding: 0 8px;
+  border-color: rgba(255, 209, 102, 0.32);
+  color: #ffd166;
+  background: linear-gradient(135deg, #071426, #0b2744);
+  font-family: var(--font-number);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.calendar-year-select option {
+  color: #ffd166;
+  background: #071426;
+  font-weight: 900;
+}
+
 .calendar-toolbar button {
   min-height: 34px;
   padding: 0 12px;
@@ -1624,14 +1650,16 @@ p {
 }
 
 .calendar-total-grid article:has(#matchedMonthProfit),
-.calendar-total-grid article:has(#matchedYearProfit) {
+.calendar-total-grid article:has(#matchedYearProfit),
+#openMatchedYearSummary {
   position: relative;
   cursor: pointer;
   border-color: rgba(255, 209, 102, 0.34);
 }
 
 .calendar-total-grid article:has(#matchedMonthProfit)::after,
-.calendar-total-grid article:has(#matchedYearProfit)::after {
+.calendar-total-grid article:has(#matchedYearProfit)::after,
+#openMatchedYearSummary::after {
   content: "查看";
   position: absolute;
   top: 9px;
@@ -1662,6 +1690,27 @@ p {
 
 .calendar-total-grid b {
   color: #ffd166;
+}
+
+.calendar-year-row .year-cell strong {
+  color: #ffd166;
+  font-family: var(--font-number);
+  font-size: 18px;
+}
+
+.calendar-year-row .profit-cell strong {
+  display: inline-block;
+  min-width: 84px;
+  padding: 6px 9px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #071426, #0b2744);
+  font-family: var(--font-number);
+  font-size: 18px;
+}
+
+.calendar-year-row .action-cell button {
+  min-height: 34px;
+  padding: 0 12px;
 }
 
 .daily-match-detail {
@@ -2141,6 +2190,18 @@ tbody tr:hover {
     font-size: 16px;
   }
 
+  .calendar-title-picker {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .calendar-year-select {
+    width: 100%;
+    min-height: 28px;
+    font-size: 12px;
+    text-align: center;
+  }
+
   .calendar-total-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2479,6 +2540,8 @@ tbody tr:hover {
   #calendarPeriodRows .amount-cell { grid-area: amount; }
   #calendarPeriodRows .fee-cell { grid-area: fee; }
   #calendarPeriodRows .count-cell { grid-area: count; }
+  #calendarPeriodRows .year-cell { grid-area: symbol; }
+  #calendarPeriodRows .action-cell { grid-area: detail; }
   #calendarPeriodRows .period-detail-cell {
     grid-area: detail;
     overflow: visible;

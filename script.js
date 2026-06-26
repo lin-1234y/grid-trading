@@ -179,7 +179,10 @@ function ensureMatchedDetailModal() {
           <div class="matched-calendar-shell">
             <div class="calendar-toolbar">
               <button id="matchedCalendarPrev" type="button">上月</button>
-              <strong id="matchedCalendarTitle">-</strong>
+              <div class="calendar-title-picker">
+                <strong id="matchedCalendarTitle">-</strong>
+                <select id="matchedCalendarYearSelect" aria-label="选择年度"></select>
+              </div>
               <button id="matchedCalendarNext" type="button">下月</button>
             </div>
             <div class="calendar-weekdays">
@@ -190,6 +193,7 @@ function ensureMatchedDetailModal() {
               <article><span>本月匹配盈亏</span><strong id="matchedMonthProfit">-</strong><em>成交金额 <b id="matchedMonthAmount">-</b></em></article>
               <article><span>本年匹配盈亏</span><strong id="matchedYearProfit">-</strong><em>成交金额 <b id="matchedYearAmount">-</b></em></article>
               <article><span>全部匹配盈亏</span><strong id="matchedAllProfit">-</strong><em>成交金额 <b id="matchedAllAmount">-</b></em></article>
+              <article id="openMatchedYearSummary"><span>各年度匹配盈亏</span><strong>查看</strong><em>按年度查询</em></article>
             </div>
           </div>
           <div class="table-wrap tall daily-match-detail">
@@ -214,7 +218,7 @@ function ensureMatchedDetailModal() {
           <div id="calendarPeriodSummary" class="modal-small-summary"></div>
           <div class="table-wrap tall">
             <table>
-              <thead><tr><th>代码/名称</th><th>匹配盈亏</th><th>匹配股数</th><th>成交金额</th><th>费用</th><th>匹配组数</th><th>买卖明细</th></tr></thead>
+              <thead id="calendarPeriodHead"><tr><th>代码/名称</th><th>匹配盈亏</th><th>匹配股数</th><th>成交金额</th><th>费用</th><th>匹配组数</th><th>买卖明细</th></tr></thead>
               <tbody id="calendarPeriodRows"></tbody>
             </table>
           </div>
@@ -1647,6 +1651,53 @@ function renderDailySymbolProfitRows(rows) {
     .join("");
 }
 
+function setCalendarPeriodHead(mode = "symbol") {
+  const head = document.querySelector("#calendarPeriodHead");
+  if (!head) return;
+  head.innerHTML = mode === "year"
+    ? `<tr><th>年度</th><th>匹配盈亏</th><th>成交金额</th><th>费用</th><th>匹配组数</th><th>操作</th></tr>`
+    : `<tr><th>代码/名称</th><th>匹配盈亏</th><th>匹配股数</th><th>成交金额</th><th>费用</th><th>匹配组数</th><th>买卖明细</th></tr>`;
+}
+
+function calendarYearSummaries() {
+  const byYear = new Map();
+  matchedCalendarRows.forEach((row) => {
+    const year = matchedEventDate(row).slice(0, 4);
+    if (!year) return;
+    const item = byYear.get(year) || { year, profit: 0, amount: 0, fee: 0, count: 0 };
+    item.profit += Number(row.profit || 0);
+    item.amount += Number(row.amount || 0);
+    item.fee += Number(row.fee || 0);
+    item.count += 1;
+    byYear.set(year, item);
+  });
+  return [...byYear.values()].sort((a, b) => b.year.localeCompare(a.year));
+}
+
+function renderCalendarYearRows() {
+  const years = calendarYearSummaries();
+  if (!years.length) return `<tr><td colspan="6" class="empty">还没有年度匹配盈亏。</td></tr>`;
+  return years.map((row) => `<tr class="calendar-year-row">${cell("年度", `<strong>${esc(row.year)}</strong>`, "year-cell")}${cell("匹配盈亏", `<strong class="${profitClass(row.profit)}">${plainInteger(row.profit)}</strong>`, "profit-cell")}${cell("成交金额", money(row.amount), "amount-cell")}${cell("费用", money(row.fee), "fee-cell")}${cell("匹配组数", `${row.count} 组`, "count-cell")}${cell("操作", `<button type="button" data-calendar-year="${esc(row.year)}">查看</button>`, "action-cell")}</tr>`).join("");
+}
+
+function openCalendarYearSummaryModal() {
+  if (!matchedCalendarRows.length) return;
+  const modal = document.querySelector("#calendarPeriodModal");
+  const title = document.querySelector("#calendarPeriodModalTitle");
+  const summary = document.querySelector("#calendarPeriodSummary");
+  const body = document.querySelector("#calendarPeriodRows");
+  if (!modal || !title || !summary || !body) return;
+  const years = calendarYearSummaries();
+  const profit = years.reduce((sum, row) => sum + Number(row.profit || 0), 0);
+  const amount = years.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  const fee = years.reduce((sum, row) => sum + Number(row.fee || 0), 0);
+  title.textContent = "各年度匹配盈亏";
+  summary.innerHTML = `${years.length} 个年度 · 盈亏 <strong class="${profitClass(profit)}">${money(profit)}</strong> · 成交金额 ${money(amount)} · 费用 ${money(fee)}`;
+  setCalendarPeriodHead("year");
+  body.innerHTML = renderCalendarYearRows();
+  modal.hidden = false;
+}
+
 function openCalendarPeriodModal(period) {
   if (!matchedCalendarMonth || !matchedCalendarRows.length) return;
   const year = matchedCalendarMonth.slice(0, 4);
@@ -1669,6 +1720,7 @@ function openCalendarPeriodModal(period) {
   if (!modal || !title || !summary || !body) return;
   title.textContent = `${label}个股匹配盈亏`;
   summary.innerHTML = `${symbols.size} 只股票 · ${rows.length} 组匹配 · 盈亏 <strong class="${profitClass(profit)}">${money(profit)}</strong> · 成交金额 ${money(amount)} · 费用 ${money(fee)}`;
+  setCalendarPeriodHead("symbol");
   body.innerHTML = renderDailySymbolProfitRows(rows);
   modal.hidden = false;
 }
@@ -1677,7 +1729,7 @@ function setMatchedModalDetailMode(summaryMode) {
   const head = document.querySelector("#matchedModalHead");
   if (!head) return;
   head.innerHTML = summaryMode
-    ? `<tr><th>代码/名称</th><th>匹配盈亏</th><th>匹配股数</th><th>成交金额</th><th>费用</th><th>匹配组数</th></tr>`
+    ? `<tr><th>代码/名称</th><th>匹配盈亏</th><th>匹配股数</th><th>成交金额</th><th>费用</th><th>匹配组数</th><th>买卖明细</th></tr>`
     : `<tr><th>卖出日期</th><th>卖价</th><th>买入日期</th><th>买价</th><th>股数</th><th>成交金额</th><th>费用</th><th>盈亏</th></tr>`;
 }
 
@@ -1719,6 +1771,7 @@ function renderMatchedCalendar(matched, options = {}) {
   matchedCalendarRows = [...matched].sort((a, b) => matchedEventDate(b).localeCompare(matchedEventDate(a)));
   const grid = document.querySelector("#matchedCalendarGrid");
   const title = document.querySelector("#matchedCalendarTitle");
+  const yearSelect = document.querySelector("#matchedCalendarYearSelect");
   const modalRows = document.querySelector("#matchedModalRows");
   if (!grid || !title || !modalRows) return;
   setMatchedModalDetailMode(matchedCalendarAggregateBySymbol);
@@ -1726,8 +1779,9 @@ function renderMatchedCalendar(matched, options = {}) {
     matchedCalendarMonth = "";
     matchedCalendarSelected = "";
     title.textContent = "-";
+    if (yearSelect) yearSelect.innerHTML = "";
     grid.innerHTML = `<div class="calendar-empty">还没有已匹配记录。</div>`;
-    modalRows.innerHTML = `<tr><td colspan="${matchedCalendarAggregateBySymbol ? 6 : 8}" class="empty">还没有可匹配的反向交易。</td></tr>`;
+    modalRows.innerHTML = `<tr><td colspan="${matchedCalendarAggregateBySymbol ? 7 : 8}" class="empty">还没有可匹配的反向交易。</td></tr>`;
     ["matchedMonthProfit", "matchedMonthAmount", "matchedYearProfit", "matchedYearAmount", "matchedAllProfit", "matchedAllAmount"].forEach((id) => {
       const node = document.querySelector(`#${id}`);
       if (node) node.textContent = "-";
@@ -1736,6 +1790,11 @@ function renderMatchedCalendar(matched, options = {}) {
   }
   const latestDate = matchedEventDate(matchedCalendarRows[0]);
   if (!matchedCalendarMonth) matchedCalendarMonth = monthKey(latestDate);
+  const availableYears = [...new Set(matchedCalendarRows.map((row) => matchedEventDate(row).slice(0, 4)).filter(Boolean))].sort((a, b) => b.localeCompare(a));
+  if (yearSelect) {
+    const currentYear = matchedCalendarMonth.slice(0, 4);
+    yearSelect.innerHTML = availableYears.map((item) => `<option value="${esc(item)}"${item === currentYear ? " selected" : ""}>${esc(item)}年</option>`).join("");
+  }
   if (!matchedCalendarSelected || monthKey(matchedCalendarSelected) !== matchedCalendarMonth) {
     const firstInMonth = matchedCalendarRows.find((row) => monthKey(matchedEventDate(row)) === matchedCalendarMonth);
     matchedCalendarSelected = firstInMonth ? matchedEventDate(firstInMonth) : `${matchedCalendarMonth}-01`;
@@ -1774,6 +1833,22 @@ function renderMatchedCalendar(matched, options = {}) {
   document.querySelector("#matchedAllAmount").textContent = money(allAmount);
   const selectedRows = matchedDayRows(matchedCalendarSelected);
   modalRows.innerHTML = matchedCalendarAggregateBySymbol ? renderDailySymbolProfitRows(selectedRows) : renderDailyMatchedRows(selectedRows);
+}
+
+function selectMatchedCalendarYear(year) {
+  const targetYear = String(year || "").slice(0, 4);
+  if (!targetYear || !matchedCalendarRows.length) return;
+  const currentMonth = matchedCalendarMonth.slice(5, 7) || "01";
+  let targetMonth = `${targetYear}-${currentMonth}`;
+  const hasSameMonth = matchedCalendarRows.some((row) => monthKey(matchedEventDate(row)) === targetMonth);
+  if (!hasSameMonth) {
+    const firstInYear = matchedCalendarRows.find((row) => matchedEventDate(row).startsWith(`${targetYear}-`));
+    if (!firstInYear) return;
+    targetMonth = monthKey(matchedEventDate(firstInYear));
+  }
+  matchedCalendarMonth = targetMonth;
+  matchedCalendarSelected = "";
+  renderMatchedCalendar(matchedCalendarRows, { aggregateBySymbol: matchedCalendarAggregateBySymbol });
 }
 
 function renderMatchedDetailRows(matched) {
@@ -2189,6 +2264,16 @@ document.addEventListener("click", (event) => {
   if (calendarTotalCard?.querySelector("#matchedYearProfit")) {
     openCalendarPeriodModal("year");
   }
+  if (event.target.closest("#openMatchedYearSummary")) {
+    openCalendarYearSummaryModal();
+  }
+  const calendarYearButton = event.target.closest("[data-calendar-year]");
+  if (calendarYearButton) {
+    const year = calendarYearButton.dataset.calendarYear || "";
+    document.querySelector("#calendarPeriodModal").hidden = true;
+    selectMatchedCalendarYear(year);
+    openCalendarPeriodModal("year");
+  }
   if (event.target.closest("#closeCalendarPeriodModal") || event.target.matches("[data-close-calendar-period-modal]")) {
     document.querySelector("#calendarPeriodModal").hidden = true;
   }
@@ -2208,6 +2293,11 @@ document.addEventListener("click", (event) => {
     matchedCalendarMonth = shiftMonth(matchedCalendarMonth, 1);
     matchedCalendarSelected = "";
     renderMatchedCalendar(matchedCalendarRows, { aggregateBySymbol: matchedCalendarAggregateBySymbol });
+  }
+});
+document.addEventListener("change", (event) => {
+  if (event.target.matches("#matchedCalendarYearSelect")) {
+    selectMatchedCalendarYear(event.target.value);
   }
 });
 els.tStartDate.addEventListener("change", () => {
