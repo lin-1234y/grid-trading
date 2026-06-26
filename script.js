@@ -127,6 +127,9 @@ let matchedCalendarRows = [];
 let matchedCalendarMonth = "";
 let matchedCalendarSelected = "";
 let matchedCalendarAggregateBySymbol = false;
+let calendarPeriodBaseRows = [];
+let calendarPeriodFilterSymbol = "";
+let calendarPeriodTitleText = "";
 let overviewRowsCache = [];
 let saveTimer = 0;
 let flowFilterSymbol = "";
@@ -216,6 +219,15 @@ function ensureMatchedDetailModal() {
             <button id="closeCalendarPeriodModal" class="icon-button" type="button">×</button>
           </div>
           <div id="calendarPeriodSummary" class="modal-small-summary"></div>
+          <div id="calendarPeriodFilter" class="calendar-period-filter" hidden>
+            <div>
+              <span>筛选股票</span>
+              <strong id="calendarPeriodFilterLabel">全部股票</strong>
+            </div>
+            <button id="toggleCalendarPeriodSymbolFilter" type="button">选择股票</button>
+            <button id="clearCalendarPeriodSymbolFilter" type="button">全部</button>
+            <div id="calendarPeriodSymbolChoices" class="calendar-period-symbol-choices" hidden></div>
+          </div>
           <div class="table-wrap tall">
             <table>
               <thead id="calendarPeriodHead"><tr><th>代码/名称</th><th>匹配盈亏</th><th>匹配股数</th><th>成交金额</th><th>费用</th><th>匹配组数</th><th>买卖明细</th></tr></thead>
@@ -1680,6 +1692,58 @@ function renderCalendarYearRows() {
   return years.map((row) => `<tr class="calendar-year-row">${cell("年度", `<strong>${esc(row.year)}</strong>`, "year-cell")}${cell("匹配盈亏", `<strong class="${profitClass(row.profit)}">${plainInteger(row.profit)}</strong>`, "profit-cell")}${cell("成交金额", money(row.amount), "amount-cell")}${cell("费用", money(row.fee), "fee-cell")}${cell("匹配组数", `${row.count} 组`, "count-cell")}${cell("操作", `<button type="button" data-calendar-year="${esc(row.year)}">查看</button>`, "action-cell")}</tr>`).join("");
 }
 
+function calendarPeriodSymbols(rows) {
+  const bySymbol = new Map();
+  rows.forEach((row) => {
+    if (!row.symbol) return;
+    const item = bySymbol.get(row.symbol) || {
+      symbol: row.symbol,
+      name: row.name || stockNameForSymbol(row.symbol),
+      count: 0,
+      profit: 0,
+    };
+    if (!item.name && row.name) item.name = row.name;
+    item.count += 1;
+    item.profit += Number(row.profit || 0);
+    bySymbol.set(row.symbol, item);
+  });
+  return [...bySymbol.values()].sort((a, b) => Math.abs(b.profit) - Math.abs(a.profit) || a.symbol.localeCompare(b.symbol));
+}
+
+function renderCalendarPeriodFilter() {
+  const wrapper = document.querySelector("#calendarPeriodFilter");
+  const label = document.querySelector("#calendarPeriodFilterLabel");
+  const choices = document.querySelector("#calendarPeriodSymbolChoices");
+  if (!wrapper || !label || !choices) return;
+  const symbols = calendarPeriodSymbols(calendarPeriodBaseRows);
+  wrapper.hidden = false;
+  const activeName = calendarPeriodFilterSymbol ? stockNameForSymbol(calendarPeriodFilterSymbol) : "";
+  label.textContent = calendarPeriodFilterSymbol ? `${calendarPeriodFilterSymbol}${activeName ? ` ${activeName}` : ""}` : "全部股票";
+  choices.innerHTML = `
+    <button class="calendar-period-symbol-chip${calendarPeriodFilterSymbol ? "" : " active"}" data-calendar-period-symbol="" type="button">全部</button>
+    ${symbols.map((row) => `<button class="calendar-period-symbol-chip${calendarPeriodFilterSymbol === row.symbol ? " active" : ""}" data-calendar-period-symbol="${esc(row.symbol)}" type="button">${symbolNameHtml(row.symbol, row.name)} <span>${row.count}组</span></button>`).join("")}
+  `;
+}
+
+function renderCalendarPeriodContent() {
+  const title = document.querySelector("#calendarPeriodModalTitle");
+  const summary = document.querySelector("#calendarPeriodSummary");
+  const body = document.querySelector("#calendarPeriodRows");
+  if (!title || !summary || !body) return;
+  const rows = calendarPeriodFilterSymbol
+    ? calendarPeriodBaseRows.filter((row) => row.symbol === calendarPeriodFilterSymbol)
+    : calendarPeriodBaseRows;
+  const profit = rows.reduce((sum, row) => sum + Number(row.profit || 0), 0);
+  const amount = rows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  const fee = rows.reduce((sum, row) => sum + Number(row.fee || 0), 0);
+  const symbols = new Set(rows.map((row) => row.symbol).filter(Boolean));
+  title.textContent = calendarPeriodTitleText;
+  summary.innerHTML = `${symbols.size} 只股票 · ${rows.length} 组匹配 · 盈亏 <strong class="${profitClass(profit)}">${money(profit)}</strong> · 成交金额 ${money(amount)} · 费用 ${money(fee)}`;
+  setCalendarPeriodHead("symbol");
+  renderCalendarPeriodFilter();
+  body.innerHTML = renderDailySymbolProfitRows(rows);
+}
+
 function openCalendarYearSummaryModal() {
   if (!matchedCalendarRows.length) return;
   const modal = document.querySelector("#calendarPeriodModal");
@@ -1693,6 +1757,8 @@ function openCalendarYearSummaryModal() {
   const fee = years.reduce((sum, row) => sum + Number(row.fee || 0), 0);
   title.textContent = "各年度匹配盈亏";
   summary.innerHTML = `${years.length} 个年度 · 盈亏 <strong class="${profitClass(profit)}">${money(profit)}</strong> · 成交金额 ${money(amount)} · 费用 ${money(fee)}`;
+  const filter = document.querySelector("#calendarPeriodFilter");
+  if (filter) filter.hidden = true;
   setCalendarPeriodHead("year");
   body.innerHTML = renderCalendarYearRows();
   modal.hidden = false;
@@ -1709,19 +1775,12 @@ function openCalendarPeriodModal(period) {
     if (isDay) return date === matchedCalendarSelected;
     return isMonth ? monthKey(date) === matchedCalendarMonth : date.startsWith(`${year}-`);
   });
-  const profit = rows.reduce((sum, row) => sum + Number(row.profit || 0), 0);
-  const amount = rows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
-  const fee = rows.reduce((sum, row) => sum + Number(row.fee || 0), 0);
-  const symbols = new Set(rows.map((row) => row.symbol).filter(Boolean));
   const modal = document.querySelector("#calendarPeriodModal");
-  const title = document.querySelector("#calendarPeriodModalTitle");
-  const summary = document.querySelector("#calendarPeriodSummary");
-  const body = document.querySelector("#calendarPeriodRows");
-  if (!modal || !title || !summary || !body) return;
-  title.textContent = `${label}个股匹配盈亏`;
-  summary.innerHTML = `${symbols.size} 只股票 · ${rows.length} 组匹配 · 盈亏 <strong class="${profitClass(profit)}">${money(profit)}</strong> · 成交金额 ${money(amount)} · 费用 ${money(fee)}`;
-  setCalendarPeriodHead("symbol");
-  body.innerHTML = renderDailySymbolProfitRows(rows);
+  if (!modal) return;
+  calendarPeriodBaseRows = rows;
+  calendarPeriodFilterSymbol = "";
+  calendarPeriodTitleText = `${label}个股匹配盈亏`;
+  renderCalendarPeriodContent();
   modal.hidden = false;
 }
 
@@ -2276,6 +2335,23 @@ document.addEventListener("click", (event) => {
   }
   if (event.target.closest("#closeCalendarPeriodModal") || event.target.matches("[data-close-calendar-period-modal]")) {
     document.querySelector("#calendarPeriodModal").hidden = true;
+  }
+  if (event.target.closest("#toggleCalendarPeriodSymbolFilter")) {
+    const choices = document.querySelector("#calendarPeriodSymbolChoices");
+    if (choices) choices.hidden = !choices.hidden;
+  }
+  if (event.target.closest("#clearCalendarPeriodSymbolFilter")) {
+    calendarPeriodFilterSymbol = "";
+    const choices = document.querySelector("#calendarPeriodSymbolChoices");
+    if (choices) choices.hidden = true;
+    renderCalendarPeriodContent();
+  }
+  const periodSymbolButton = event.target.closest("[data-calendar-period-symbol]");
+  if (periodSymbolButton) {
+    calendarPeriodFilterSymbol = periodSymbolButton.dataset.calendarPeriodSymbol || "";
+    const choices = document.querySelector("#calendarPeriodSymbolChoices");
+    if (choices) choices.hidden = true;
+    renderCalendarPeriodContent();
   }
   const dayButton = event.target.closest(".calendar-day[data-date]");
   if (dayButton) {

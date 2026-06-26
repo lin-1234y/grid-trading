@@ -1476,6 +1476,75 @@ p {
   font-size: 17px;
 }
 
+.calendar-period-filter {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  margin: -2px 0 10px;
+  padding: 9px;
+  border: 1px solid rgba(255, 209, 102, 0.18);
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(8, 13, 24, 0.9), rgba(11, 39, 68, 0.66));
+}
+
+.calendar-period-filter[hidden] {
+  display: none;
+}
+
+.calendar-period-filter span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.calendar-period-filter strong {
+  display: block;
+  margin-top: 2px;
+  color: #ffd166;
+  font-weight: 950;
+}
+
+.calendar-period-filter button {
+  min-height: 34px;
+  padding: 0 10px;
+}
+
+.calendar-period-symbol-choices {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(126px, 1fr));
+  gap: 7px;
+}
+
+.calendar-period-symbol-choices[hidden] {
+  display: none;
+}
+
+.calendar-period-symbol-chip {
+  min-height: 42px;
+  padding: 5px 8px;
+  border: 1px solid rgba(255, 209, 102, 0.22);
+  border-radius: 8px;
+  background: linear-gradient(135deg, #071426, #0b2744);
+  color: #ffd166;
+  text-align: left;
+  font-weight: 900;
+}
+
+.calendar-period-symbol-chip.active {
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--hot-red), var(--hot-orange), var(--blue));
+  color: #fff;
+}
+
+.calendar-period-symbol-chip span {
+  margin-left: 4px;
+  color: inherit;
+  opacity: 0.78;
+}
+
 .overview-count-link strong {
   display: block;
 }
@@ -2203,6 +2272,18 @@ tbody tr:hover {
   }
 
   .calendar-total-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .calendar-period-filter {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .calendar-period-filter > div {
+    grid-column: 1 / -1;
+  }
+
+  .calendar-period-symbol-choices {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
