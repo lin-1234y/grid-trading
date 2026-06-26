@@ -65,6 +65,8 @@ const els = {
   overviewSort: document.querySelector("#overviewSortInput"),
   currentFlowSymbol: document.querySelector("#currentFlowSymbol"),
   openFlowSymbolPicker: document.querySelector("#openFlowSymbolPicker"),
+  flowStartDate: document.querySelector("#flowStartDateInput"),
+  flowEndDate: document.querySelector("#flowEndDateInput"),
   tFilterSymbol: document.querySelector("#tFilterSymbolInput"),
   tStartDate: document.querySelector("#tStartDateInput"),
   tEndDate: document.querySelector("#tEndDateInput"),
@@ -212,7 +214,7 @@ function ensureMatchedDetailModal() {
           <div id="calendarPeriodSummary" class="modal-small-summary"></div>
           <div class="table-wrap tall">
             <table>
-              <thead><tr><th>代码/名称</th><th>匹配盈亏</th><th>匹配股数</th><th>成交金额</th><th>费用</th><th>匹配组数</th></tr></thead>
+              <thead><tr><th>代码/名称</th><th>匹配盈亏</th><th>匹配股数</th><th>成交金额</th><th>费用</th><th>匹配组数</th><th>买卖明细</th></tr></thead>
               <tbody id="calendarPeriodRows"></tbody>
             </table>
           </div>
@@ -379,6 +381,8 @@ function collectState(options = {}) {
     },
     flow: {
       symbol: flowFilterSymbol,
+      startDate: els.flowStartDate.value,
+      endDate: els.flowEndDate.value,
     },
     originalPositions,
     equityEvents,
@@ -512,6 +516,8 @@ function restoreState() {
   if (query.endDate !== undefined) els.tEndDate.value = query.endDate;
   const flow = state.flow || {};
   if (flow.symbol !== undefined) flowFilterSymbol = flow.symbol;
+  if (flow.startDate !== undefined) els.flowStartDate.value = flow.startDate;
+  if (flow.endDate !== undefined) els.flowEndDate.value = flow.endDate;
   originalPositions = state.originalPositions && typeof state.originalPositions === "object" ? state.originalPositions : {};
   equityEvents = Array.isArray(state.equityEvents) ? state.equityEvents : [];
   if (Array.isArray(state.trades) && !trades.length) trades = state.trades;
@@ -1265,7 +1271,12 @@ async function confirmBrokerImport() {
 
 function renderAllTrades(editId = "") {
   renderFlowSymbolChoices();
-  const visible = flowFilterSymbol ? trades.filter((t) => t.symbol === flowFilterSymbol) : trades;
+  const startDate = els.flowStartDate.value;
+  const endDate = els.flowEndDate.value;
+  const visible = trades
+    .filter((trade) => !flowFilterSymbol || trade.symbol === flowFilterSymbol)
+    .filter((trade) => !startDate || trade.date >= startDate)
+    .filter((trade) => !endDate || trade.date <= endDate);
   const sorted = [...visible].sort((a, b) => `${b.date}-${b.createdAt}`.localeCompare(`${a.date}-${a.createdAt}`));
   const rowsToRender = sorted.slice(0, flowRenderLimit);
   const rowsHtml = rowsToRender.map((t, i) => {
@@ -1277,7 +1288,11 @@ function renderAllTrades(editId = "") {
   const moreHtml = sorted.length > rowsToRender.length
     ? `<tr class="load-more-row"><td colspan="9"><button type="button" data-action="load-flow-more">显示更多 ${Math.min(FLOW_RENDER_STEP, sorted.length - rowsToRender.length)} 笔</button><span>已显示 ${rowsToRender.length} / ${sorted.length} 笔</span></td></tr>`
     : "";
-  els.tradeFlowRows.innerHTML = sorted.length ? rowsHtml + moreHtml : `<tr><td colspan="9" class="empty">${flowFilterSymbol ? `没有 ${esc(flowFilterSymbol)} 的交易流水。` : "还没有交易流水。"}</td></tr>`;
+  const filterLabel = [
+    flowFilterSymbol ? `${esc(flowFilterSymbol)}` : "",
+    startDate || endDate ? `${startDate || "最早"} 至 ${endDate || "最新"}` : "",
+  ].filter(Boolean).join(" · ");
+  els.tradeFlowRows.innerHTML = sorted.length ? rowsHtml + moreHtml : `<tr><td colspan="9" class="empty">${filterLabel ? `没有符合“${filterLabel}”的交易流水。` : "还没有交易流水。"}</td></tr>`;
 }
 
 function renderOverview() {
@@ -1587,8 +1602,24 @@ function renderDailyMatchedRows(rows) {
   return rows.map((r) => `<tr>${cell("卖出日期", esc(r.sellDate), "sell-date-cell")}${cell("卖价", money(r.sellPrice), "sell-price-cell")}${cell("买入日期", esc(r.buyDate), "buy-date-cell")}${cell("买价", money(r.buyPrice), "buy-price-cell")}${cell("股数", qty(r.shares), "shares-cell")}${cell("成交金额", money(r.amount), "amount-cell")}${cell("费用", money(r.fee), "fee-cell")}${cell("盈亏", money(r.profit), `${profitClass(r.profit)} profit-cell`)}</tr>`).join("");
 }
 
+function renderCalendarPeriodDetailItems(rows) {
+  const sorted = [...rows].sort((a, b) => {
+    const dateCompare = matchedEventDate(b).localeCompare(matchedEventDate(a));
+    if (dateCompare) return dateCompare;
+    return Number(b.profit || 0) - Number(a.profit || 0);
+  });
+  return `<div class="period-match-detail-list">${sorted.map((row) => `
+    <div class="period-match-detail">
+      <div><span>卖出</span><strong>${esc(row.sellDate)}</strong><em>${money(row.sellPrice)}</em></div>
+      <div><span>买入</span><strong>${esc(row.buyDate)}</strong><em>${money(row.buyPrice)}</em></div>
+      <div><span>股数</span><strong>${qty(row.shares)}</strong><em>${money(row.amount)}</em></div>
+      <div><span>盈亏</span><strong class="${profitClass(row.profit)}">${plainInteger(row.profit)}</strong><em>费 ${money(row.fee)}</em></div>
+    </div>
+  `).join("")}</div>`;
+}
+
 function renderDailySymbolProfitRows(rows) {
-  if (!rows.length) return `<tr><td colspan="6" class="empty">当天没有匹配盈亏。</td></tr>`;
+  if (!rows.length) return `<tr><td colspan="7" class="empty">当天没有匹配盈亏。</td></tr>`;
   const bySymbol = new Map();
   rows.forEach((row) => {
     const item = bySymbol.get(row.symbol) || {
@@ -1599,6 +1630,7 @@ function renderDailySymbolProfitRows(rows) {
       amount: 0,
       fee: 0,
       count: 0,
+      rows: [],
     };
     if (!item.name && row.name) item.name = row.name;
     item.profit += Number(row.profit || 0);
@@ -1606,11 +1638,12 @@ function renderDailySymbolProfitRows(rows) {
     item.amount += Number(row.amount || 0);
     item.fee += Number(row.fee || 0);
     item.count += 1;
+    item.rows.push(row);
     bySymbol.set(row.symbol, item);
   });
   return [...bySymbol.values()]
     .sort((a, b) => Math.abs(b.profit) - Math.abs(a.profit) || a.symbol.localeCompare(b.symbol))
-    .map((row) => `<tr>${cell("代码/名称", symbolNameHtml(row.symbol, row.name), "symbol-cell")}${cell("匹配盈亏", `<strong class="${profitClass(row.profit)}">${money(row.profit)}</strong>`, "profit-cell")}${cell("匹配股数", `${qty(row.shares)} 股`, "shares-cell")}${cell("成交金额", money(row.amount), "amount-cell")}${cell("费用", money(row.fee), "fee-cell")}${cell("匹配组数", `${row.count} 组`, "count-cell")}</tr>`)
+    .map((row) => `<tr class="calendar-period-symbol-row">${cell("代码/名称", symbolNameHtml(row.symbol, row.name), "symbol-cell")}${cell("匹配盈亏", `<strong class="${profitClass(row.profit)}">${plainInteger(row.profit)}</strong>`, "profit-cell")}${cell("匹配股数", `${qty(row.shares)} 股`, "shares-cell")}${cell("成交金额", money(row.amount), "amount-cell")}${cell("费用", money(row.fee), "fee-cell")}${cell("匹配组数", `${row.count} 组`, "count-cell")}${cell("买卖明细", renderCalendarPeriodDetailItems(row.rows), "period-detail-cell")}</tr>`)
     .join("");
 }
 
@@ -2083,6 +2116,13 @@ document.querySelector("#overviewWindow thead")?.addEventListener("click", (even
   renderOverview();
 });
 els.openFlowSymbolPicker.addEventListener("click", () => openSymbolModal("flow"));
+const refreshFlowDateFilter = () => {
+  flowRenderLimit = FLOW_RENDER_STEP;
+  renderAllTrades();
+  saveState();
+};
+els.flowStartDate.addEventListener("change", refreshFlowDateFilter);
+els.flowEndDate.addEventListener("change", refreshFlowDateFilter);
 els.openQuerySymbolPicker.addEventListener("click", () => openSymbolModal("query"));
 els.closeSymbolModal.addEventListener("click", closeSymbolModal);
 els.symbolModal.addEventListener("click", (event) => {
