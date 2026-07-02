@@ -1,4 +1,4 @@
-const CACHE_NAME = "grid-trading-v80";
+const CACHE_NAME = "grid-trading-v84";
 const ASSETS = [
   "./",
   "./index.html",

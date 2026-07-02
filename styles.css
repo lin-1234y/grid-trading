@@ -617,6 +617,51 @@ p {
   color: #34f5c5;
 }
 
+.equity-detail-metric {
+  align-content: start;
+}
+
+.equity-detail-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  color: #d8e7f8;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.equity-detail-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 8px;
+  padding: 7px;
+  border: 1px solid rgba(255, 209, 102, 0.18);
+  border-radius: 7px;
+  background: linear-gradient(135deg, rgba(6, 17, 31, 0.95), rgba(11, 39, 68, 0.7));
+}
+
+.equity-detail-item strong {
+  margin: 0;
+  color: #ffd166;
+  font-size: 13px;
+}
+
+.equity-detail-item span {
+  color: #ff5c6b;
+  font-weight: 950;
+}
+
+.equity-detail-item em {
+  grid-column: 1 / -1;
+  color: #a9ccff;
+  font-size: 11px;
+  font-style: normal;
+}
+
+.empty-equity-detail {
+  color: var(--muted);
+}
+
 .stage-summary-row {
   background:
     linear-gradient(135deg, rgba(255, 209, 102, 0.14), rgba(52, 245, 197, 0.08), rgba(15, 23, 42, 0.96)) !important;
@@ -672,6 +717,42 @@ p {
 
 #tradeFlowRows .side-cell.side-sell {
   color: #67e8f9;
+}
+
+#tradeFlowRows tr.flow-buy {
+  background:
+    linear-gradient(135deg, rgba(255, 92, 107, 0.18), rgba(10, 18, 34, 0.92) 46%, rgba(255, 122, 160, 0.10));
+}
+
+#tradeFlowRows tr.flow-sell {
+  background:
+    linear-gradient(135deg, rgba(52, 245, 197, 0.16), rgba(10, 18, 34, 0.92) 46%, rgba(81, 207, 102, 0.10));
+}
+
+#tradeFlowRows tr.flow-buy:nth-child(even),
+#tradeFlowRows tr.flow-sell:nth-child(even) {
+  background:
+    linear-gradient(135deg, rgba(255, 92, 107, 0.13), rgba(12, 20, 35, 0.94) 48%, rgba(52, 245, 197, 0.10));
+}
+
+#tradeFlowRows tr.flow-buy .side-cell {
+  border-color: rgba(255, 92, 107, 0.55);
+  background: rgba(255, 92, 107, 0.14);
+}
+
+#tradeFlowRows tr.flow-sell .side-cell {
+  border-color: rgba(52, 245, 197, 0.45);
+  background: rgba(52, 245, 197, 0.13);
+  color: #34f5c5;
+}
+
+#tradeFlowRows .price-cell,
+#tradeFlowRows .shares-cell {
+  color: #ff4fd8;
+  font-family: var(--font-number);
+  font-size: 16px;
+  font-weight: 950;
+  text-shadow: 0 0 8px rgba(255, 79, 216, 0.32);
 }
 
 .scenario-grid {
@@ -1108,6 +1189,22 @@ p {
   font-weight: 950;
 }
 
+.overview-stats article:nth-child(3) strong,
+.overview-stats article:nth-child(4) strong {
+  color: #ff5c6b;
+  font-size: 25px;
+  text-shadow: 0 0 10px rgba(255, 92, 107, 0.35);
+}
+
+#overviewRows td[data-label="总盈亏"],
+#overviewRows td[data-label="已匹配"] {
+  color: #ff5c6b;
+  font-family: var(--font-number);
+  font-size: 15px;
+  font-weight: 950;
+  text-shadow: 0 0 8px rgba(255, 92, 107, 0.26);
+}
+
 .status-pill {
   display: inline-grid;
   min-width: 54px;
@@ -1400,6 +1497,16 @@ p {
   min-width: 260px;
 }
 
+.calendar-period-symbol-row > .profit-cell > strong {
+  display: inline-block;
+  min-width: 76px;
+  padding: 7px 10px;
+  font-family: var(--font-number);
+  font-size: 22px;
+  line-height: 1;
+  text-align: center;
+}
+
 .period-match-detail-list {
   display: grid;
   gap: 5px;
@@ -1514,8 +1621,8 @@ p {
 .calendar-period-symbol-choices {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(126px, 1fr));
-  gap: 7px;
+  grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
+  gap: 4px;
 }
 
 .calendar-period-symbol-choices[hidden] {
@@ -1523,26 +1630,39 @@ p {
 }
 
 .calendar-period-symbol-chip {
-  min-height: 42px;
-  padding: 5px 8px;
+  min-height: 34px;
+  padding: 4px 7px;
   border: 1px solid rgba(255, 209, 102, 0.22);
-  border-radius: 8px;
-  background: linear-gradient(135deg, #071426, #0b2744);
+  border-radius: 7px;
+  background: linear-gradient(135deg, #06111f, #0b2744);
   color: #ffd166;
   text-align: left;
   font-weight: 900;
 }
 
 .calendar-period-symbol-chip.active {
-  border-color: transparent;
-  background: linear-gradient(135deg, var(--hot-red), var(--hot-orange), var(--blue));
-  color: #fff;
+  border-color: rgba(255, 209, 102, 0.75);
+  background: linear-gradient(135deg, #0a1830, #113a68);
+  color: #ffe88d;
+  box-shadow: 0 0 0 1px rgba(255, 209, 102, 0.18) inset;
 }
 
 .calendar-period-symbol-chip span {
   margin-left: 4px;
-  color: inherit;
-  opacity: 0.78;
+  color: #a9ccff;
+  opacity: 1;
+  font-size: 11px;
+}
+
+.calendar-period-symbol-chip .symbol-code {
+  font-size: 11px;
+  line-height: 1.05;
+}
+
+.calendar-period-symbol-chip .symbol-name {
+  margin-top: 2px;
+  font-size: 14px;
+  line-height: 1.05;
 }
 
 .overview-count-link strong {
@@ -2284,7 +2404,17 @@ tbody tr:hover {
   }
 
   .calendar-period-symbol-choices {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .calendar-period-symbol-chip {
+    min-height: 32px;
+    padding: 4px 6px;
+  }
+
+  .calendar-period-symbol-chip .symbol-name {
+    font-size: 13px;
   }
 
   .unmatched-chip {

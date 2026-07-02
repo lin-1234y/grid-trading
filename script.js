@@ -106,6 +106,7 @@ const els = {
   tClearanceHint: document.querySelector("#tClearanceHint"),
   tFinalProfit: document.querySelector("#tFinalProfit"),
   tFinalProfitHint: document.querySelector("#tFinalProfitHint"),
+  tEquityDetails: document.querySelector("#tEquityDetails"),
   backupName: document.querySelector("#backupNameInput"),
   exportBackup: document.querySelector("#exportBackupButton"),
   importBackup: document.querySelector("#importBackupInput"),
@@ -998,6 +999,34 @@ function renderClearanceProfit(activeSymbol, positionEstimate, matchedProfit, op
   els.tFinalProfitHint.textContent = "已匹配盈亏 + 清仓匹配盈亏";
 }
 
+function renderQueryEquityDetails(activeSymbol, throughDate) {
+  if (!els.tEquityDetails) return;
+  if (!activeSymbol) {
+    els.tEquityDetails.innerHTML = `<span class="empty-equity-detail">选择股票后显示</span>`;
+    return;
+  }
+  const rows = equityEventsForSymbol(activeSymbol, throughDate);
+  if (!rows.length) {
+    els.tEquityDetails.innerHTML = `<span class="empty-equity-detail">没有分红送股记录</span>`;
+    return;
+  }
+  els.tEquityDetails.innerHTML = rows.map((event) => {
+    const cash = Number(event.cash || 0);
+    const bonus = Number(event.bonusPer10 || 0);
+    const parts = [];
+    if (cash) parts.push(`现金 ${priceText(cash)}/股`);
+    if (bonus) parts.push(`每10股送转 ${qty(bonus)}`);
+    if (!parts.length) parts.push("仅备注");
+    return `
+      <div class="equity-detail-item">
+        <strong>${esc(event.date)}</strong>
+        <span>${parts.join(" · ")}</span>
+        ${event.note ? `<em>${esc(event.note)}</em>` : ""}
+      </div>
+    `;
+  }).join("");
+}
+
 async function loadTrades() {
   try {
     const stored = await loadTradesFromDb();
@@ -1299,7 +1328,7 @@ function renderAllTrades(editId = "") {
     if (t.id === editId) {
       return `<tr data-id="${t.id}" class="edit-row">${cell("序号", i + 1, "seq-cell")}${cell("日期", `<input data-edit="date" type="date" value="${esc(t.date)}">`, "date-cell")}${cell("代码/名称", `<input data-edit="symbol" value="${esc(t.symbol)}"><input data-edit="name" value="${esc(tradeName(t))}" placeholder="名称">`, "symbol-cell")}${cell("方向", `<select data-edit="side"><option value="buy"${t.side === "buy" ? " selected" : ""}>买入</option><option value="sell"${t.side === "sell" ? " selected" : ""}>卖出</option></select>`, "side-cell")}${cell("价格", `<input data-edit="price" type="number" step="0.001" value="${t.price}">`, "price-cell")}${cell("股数", `<input data-edit="shares" type="number" step="100" value="${t.shares}">`, "shares-cell")}${cell("成交金额", money(t.amount), "amount-cell")}${cell("费用", `<input data-edit="fee" type="number" step="0.01" value="${t.fee}">`, "fee-cell")}${cell("操作", `<button data-action="save">保存</button><button data-action="cancel">取消</button>`, "action-cell")}</tr>`;
     }
-    return `<tr data-id="${t.id}">${cell("序号", i + 1, "seq-cell")}${cell("日期", esc(t.date), "date-cell")}${cell("代码/名称", symbolNameHtml(t.symbol, tradeName(t)), "symbol-cell")}${cell("方向", t.side === "buy" ? "买入" : "卖出", `tag-cell side-cell side-${t.side}`)}${cell("价格", money(t.price), "price-cell")}${cell("股数", qty(t.shares), "shares-cell")}${cell("成交金额", money(t.amount), "amount-cell")}${cell("费用", money(t.fee), "fee-cell")}${cell("操作", `<button data-action="edit">编辑</button><button data-action="delete">删除</button>`, "action-cell")}</tr>`;
+    return `<tr data-id="${t.id}" class="flow-${t.side}">${cell("序号", i + 1, "seq-cell")}${cell("日期", esc(t.date), "date-cell")}${cell("代码/名称", symbolNameHtml(t.symbol, tradeName(t)), "symbol-cell")}${cell("方向", t.side === "buy" ? "买入" : "卖出", `tag-cell side-cell side-${t.side}`)}${cell("价格", money(t.price), "price-cell")}${cell("股数", qty(t.shares), "shares-cell")}${cell("成交金额", money(t.amount), "amount-cell")}${cell("费用", money(t.fee), "fee-cell")}${cell("操作", `<button data-action="edit">编辑</button><button data-action="delete">删除</button>`, "action-cell")}</tr>`;
   }).join("");
   const moreHtml = sorted.length > rowsToRender.length
     ? `<tr class="load-more-row"><td colspan="9"><button type="button" data-action="load-flow-more">显示更多 ${Math.min(FLOW_RENDER_STEP, sorted.length - rowsToRender.length)} 笔</button><span>已显示 ${rowsToRender.length} / ${sorted.length} 笔</span></td></tr>`
@@ -2078,6 +2107,7 @@ function renderQuery() {
   els.tOpenSellAvg.textContent = openSell ? priceText(openSellAmount / openSell) : "-";
   const positionEstimate = renderPositionEstimate(activeSymbol, openBuy, openSell, profit, totalBuyAmount, totalSellAmount);
   renderClearanceProfit(activeSymbol, positionEstimate, profit, openBuyAmount, openSellAmount);
+  renderQueryEquityDetails(activeSymbol, throughDate);
   els.matchedSummary.textContent = `${matched.length} 组匹配 · 最近 7 天明细`;
   els.unmatchedSummary.textContent = `${unmatched.length} 条未匹配`;
   const matchedHtml = renderMatchedDetailRows(matched);
