@@ -726,24 +726,34 @@ p {
 
 #tradeFlowRows tr.flow-sell {
   background:
-    linear-gradient(135deg, rgba(52, 245, 197, 0.16), rgba(10, 18, 34, 0.92) 46%, rgba(81, 207, 102, 0.10));
+    linear-gradient(135deg, rgba(34, 211, 238, 0.24), rgba(8, 31, 48, 0.94) 48%, rgba(52, 245, 197, 0.18)) !important;
 }
 
-#tradeFlowRows tr.flow-buy:nth-child(even),
-#tradeFlowRows tr.flow-sell:nth-child(even) {
+#tradeFlowRows tr.flow-buy:nth-child(even) {
   background:
     linear-gradient(135deg, rgba(255, 92, 107, 0.13), rgba(12, 20, 35, 0.94) 48%, rgba(52, 245, 197, 0.10));
 }
 
+#tradeFlowRows tr.flow-sell:nth-child(even) {
+  background:
+    linear-gradient(135deg, rgba(34, 211, 238, 0.20), rgba(7, 27, 44, 0.95) 48%, rgba(52, 245, 197, 0.15)) !important;
+}
+
+#tradeFlowRows tr.flow-sell:hover {
+  background:
+    linear-gradient(135deg, rgba(34, 211, 238, 0.32), rgba(8, 38, 58, 0.96) 48%, rgba(52, 245, 197, 0.24)) !important;
+}
+
 #tradeFlowRows tr.flow-buy .side-cell {
-  border-color: rgba(255, 92, 107, 0.55);
-  background: rgba(255, 92, 107, 0.14);
+  border-color: rgba(255, 132, 150, 0.76);
+  background: linear-gradient(135deg, rgba(255, 168, 184, 0.38), rgba(255, 92, 107, 0.22));
+  color: #ff6f88;
 }
 
 #tradeFlowRows tr.flow-sell .side-cell {
-  border-color: rgba(52, 245, 197, 0.45);
-  background: rgba(52, 245, 197, 0.13);
-  color: #34f5c5;
+  border-color: rgba(135, 245, 190, 0.72);
+  background: linear-gradient(135deg, rgba(155, 255, 205, 0.36), rgba(52, 245, 197, 0.20));
+  color: #67ffc9;
 }
 
 #tradeFlowRows .price-cell,
