@@ -351,21 +351,30 @@
     <template id="gridTemplate">
       <article class="grid-card">
         <div class="grid-card-head"><strong class="grid-title">网格</strong><button type="button" class="delete-grid">删除</button></div>
-        <div class="form-grid">
-          <label class="field"><span>网格下限</span><input data-field="lower" type="number" step="0.001"></label>
-          <label class="field"><span>网格上限</span><input data-field="upper" type="number" step="0.001"></label>
-          <label class="field"><span>买入步长类型</span><select data-field="buyStepType"><option value="percent">百分比</option><option value="value">具体金额</option></select></label>
-          <label class="field"><span>买入步长</span><input data-field="buyStep" type="number" step="0.001"></label>
-          <label class="field"><span>买入方式</span><select data-field="buyMode"><option value="amount">金额</option><option value="shares">股数</option></select></label>
-          <label class="field"><span>每格买入</span><input data-field="buySize" type="number" step="100"></label>
-          <label class="field"><span>卖出步长类型</span><select data-field="sellStepType"><option value="percent">百分比</option><option value="value">具体金额</option></select></label>
-          <label class="field"><span>卖出步长</span><input data-field="sellStep" type="number" step="0.001"></label>
-          <label class="field"><span>卖出方式</span><select data-field="sellMode"><option value="amount">金额</option><option value="shares">股数</option></select></label>
-          <label class="field"><span>每格卖出</span><input data-field="sellSize" type="number" step="100"></label>
+        <div class="form-grid grid-config-form">
+          <section class="grid-range-section">
+            <h4>价格区间</h4>
+            <label class="field"><span>网格下限</span><input data-field="lower" type="number" step="0.001"></label>
+            <label class="field"><span>网格上限</span><input data-field="upper" type="number" step="0.001"></label>
+          </section>
+          <section class="grid-side-section buy">
+            <h4>买入设置</h4>
+            <label class="field"><span>步长类型</span><select data-field="buyStepType"><option value="percent">百分比</option><option value="value">具体金额</option></select></label>
+            <label class="field"><span>买入步长</span><input data-field="buyStep" type="number" step="0.001"></label>
+            <label class="field"><span>买入方式</span><select data-field="buyMode"><option value="amount">金额</option><option value="shares">股数</option></select></label>
+            <label class="field"><span>每格买入</span><input data-field="buySize" type="number" step="100"></label>
+          </section>
+          <section class="grid-side-section sell">
+            <h4>卖出设置</h4>
+            <label class="field"><span>步长类型</span><select data-field="sellStepType"><option value="percent">百分比</option><option value="value">具体金额</option></select></label>
+            <label class="field"><span>卖出步长</span><input data-field="sellStep" type="number" step="0.001"></label>
+            <label class="field"><span>卖出方式</span><select data-field="sellMode"><option value="amount">金额</option><option value="shares">股数</option></select></label>
+            <label class="field"><span>每格卖出</span><input data-field="sellSize" type="number" step="100"></label>
+          </section>
         </div>
       </article>
     </template>
 
-    <script src="script.js?v=88"></script>
+    <script src="script.js?v=92"></script>
   </body>
 </html>

@@ -120,6 +120,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
 
 let grids = [];
 let scenarioRows = [];
+let scenarioSkipRows = [];
 let trades = [];
 let pendingBrokerTrades = [];
 let originalPositions = {};
@@ -603,6 +604,8 @@ function orderShares(price, grid, side, acct) {
 function buyEvents(acct, activeGrids) {
   const events = [];
   activeGrids.forEach((grid, gridIndex) => {
+    if (grid.upper < grid.lower) return;
+    if (stepPrice(acct.currentPrice, grid, "buy") <= 0) return;
     let price = acct.currentPrice - stepPrice(acct.currentPrice, grid, "buy");
     for (let guard = 0; price >= grid.lower && price > 0 && guard < 500; guard += 1) {
       if (price <= grid.upper) {
@@ -620,6 +623,8 @@ function buyEvents(acct, activeGrids) {
 function sellEvents(acct, activeGrids) {
   const events = [];
   activeGrids.forEach((grid, gridIndex) => {
+    if (grid.upper < grid.lower) return;
+    if (stepPrice(acct.currentPrice, grid, "sell") <= 0) return;
     let price = acct.currentPrice + stepPrice(acct.currentPrice, grid, "sell");
     for (let guard = 0; price <= grid.upper && guard < 500; guard += 1) {
       if (price >= grid.lower) {
@@ -635,15 +640,67 @@ function sellEvents(acct, activeGrids) {
 }
 
 function scenarioRow(type, scenario, event, shares, amount, fee, note = "") {
-  return { type, scenario, grid: `网格 ${event.gridIndex + 1}`, side: event.side, price: event.price, shares, amount, fee, note };
+  return { type, scenario, gridIndex: event.gridIndex, grid: `网格 ${event.gridIndex + 1}`, side: event.side, price: event.price, shares, amount, fee, note };
+}
+
+function buyNoTriggerReason(acct, grid) {
+  if (grid.upper < grid.lower) return "网格上限低于下限";
+  const step = stepPrice(acct.currentPrice, grid, "buy");
+  if (step <= 0) return "买入步长为空或为 0";
+  if (acct.currentPrice <= grid.lower) return "当前价已低于或等于网格下限，单边下跌不会触发该网格";
+  const probePrice = Math.min(Math.max(grid.lower, acct.currentPrice - step), grid.upper);
+  if (orderShares(probePrice, grid, "buy", acct) <= 0) return "每格买入不足一手";
+  return "下跌路径没有进入该网格区间";
+}
+
+function sellNoTriggerReason(acct, grid) {
+  if (grid.upper < grid.lower) return "网格上限低于下限";
+  const step = stepPrice(acct.currentPrice, grid, "sell");
+  if (step <= 0) return "卖出步长为空或为 0";
+  if (acct.currentPrice >= grid.upper) return "当前价已高于或等于网格上限，单边上涨不会触发该网格";
+  const probePrice = Math.max(Math.min(grid.upper, acct.currentPrice + step), grid.lower);
+  if (orderShares(probePrice, grid, "sell", acct) <= 0) return "每格卖出不足一手";
+  return "上涨路径没有进入该网格区间";
+}
+
+function buildScenarioSkipRows(acct, activeGrids, rowsByType, lowerPrice) {
+  const labels = { up: "单边上涨", down: "单边下跌", rebound: "先跌后涨" };
+  return ["up", "down", "rebound"].flatMap((type) => activeGrids
+    .map((grid, gridIndex) => {
+      if (rowsByType[type].some((row) => row.gridIndex === gridIndex)) return null;
+      let note = "";
+      if (type === "up") note = sellNoTriggerReason(acct, grid);
+      if (type === "down") note = buyNoTriggerReason(acct, grid);
+      if (type === "rebound") {
+        const buyReason = buyNoTriggerReason(acct, grid);
+        const sellReason = sellNoTriggerReason({ ...acct, currentPrice: lowerPrice }, grid);
+        note = `下跌：${buyReason}；反弹：${sellReason}`;
+      }
+      return {
+        type,
+        scenario: labels[type],
+        gridIndex,
+        grid: `网格 ${gridIndex + 1}`,
+        side: "未触发",
+        price: 0,
+        shares: 0,
+        amount: 0,
+        fee: 0,
+        note,
+      };
+    })
+    .filter(Boolean));
 }
 
 function renderScenarioDetails() {
   const pane = els.scenarioWindow.dataset.scenarioPane || "setup";
   const visible = ["up", "down", "rebound"].includes(pane) ? scenarioRows.filter((r) => r.type === pane) : scenarioRows;
-  els.detailRows.innerHTML = visible.length ? visible.map((r, i) => `<tr class="scenario-${esc(r.type)}-row">${cell("序号", i + 1)}${cell("情形", esc(r.scenario), "tag-cell")}${cell("网格", esc(r.grid), "tag-cell")}${cell("方向", esc(r.side))}${cell("触发价", money(r.price))}${cell("股数", qty(r.shares))}${cell("成交金额", money(r.amount))}${cell("费用", money(r.fee))}${cell("说明", esc(r.note || "-"))}</tr>`).join("") : `<tr><td colspan="9" class="empty">没有触发任何网格。</td></tr>`;
+  const skipped = ["up", "down", "rebound"].includes(pane) ? scenarioSkipRows.filter((r) => r.type === pane) : scenarioSkipRows;
+  const triggeredHtml = visible.map((r, i) => `<tr class="scenario-${esc(r.type)}-row">${cell("序号", i + 1)}${cell("情形", esc(r.scenario), "tag-cell")}${cell("网格", esc(r.grid), "tag-cell")}${cell("方向", esc(r.side))}${cell("触发价", money(r.price))}${cell("股数", qty(r.shares))}${cell("成交金额", money(r.amount))}${cell("费用", money(r.fee))}${cell("说明", esc(r.note || "-"))}</tr>`).join("");
+  const skippedHtml = skipped.map((r) => `<tr class="scenario-skip-row">${cell("序号", "-")}${cell("情形", esc(r.scenario), "tag-cell")}${cell("网格", esc(r.grid), "tag-cell")}${cell("方向", esc(r.side))}${cell("触发价", "-")}${cell("股数", "-")}${cell("成交金额", "-")}${cell("费用", "-")}${cell("说明", esc(r.note || "-"))}</tr>`).join("");
+  els.detailRows.innerHTML = triggeredHtml || skippedHtml ? `${triggeredHtml}${skippedHtml}` : `<tr><td colspan="9" class="empty">没有触发任何网格。</td></tr>`;
   const label = { up: "单边上涨", down: "单边下跌", rebound: "先跌后涨" }[pane] || "全部";
-  els.detailSummary.textContent = `${label} ${visible.length} 条触发明细`;
+  els.detailSummary.textContent = `${label} ${visible.length} 条触发明细${skipped.length ? `，${skipped.length} 个网格未触发` : ""}`;
 }
 
 function runScenarios() {
@@ -670,6 +727,7 @@ function runScenarios() {
     upRows.push(scenarioRow("up", "单边上涨", event, sold, amount, fee));
   });
   const upFinal = upShares * upper;
+  const upFinalTotal = upFinal + upCash;
   const upProfit = upFinal + upCash - originalCost;
 
   let downShares = acct.holdingShares;
@@ -681,6 +739,8 @@ function runScenarios() {
     downRows.push(scenarioRow("down", "单边下跌", event, event.shares, event.amount, event.fee));
   });
   const downValue = downShares * lower;
+  const downTotalCost = originalCost + downCash;
+  const downAvgCost = downShares > 0 ? downTotalCost / downShares : 0;
   const downLoss = originalCost + downCash - downValue;
 
   let reboundShares = acct.holdingShares;
@@ -702,22 +762,66 @@ function runScenarios() {
     reboundRows.push(scenarioRow("rebound", "先跌后涨", event, sold, amount, fee, "反弹阶段"));
   });
   const reboundProfit = reboundShares * upper + reboundSell - originalCost - reboundBuy;
+  const reboundFinalValue = reboundShares * upper;
+  const reboundFinalTotal = reboundFinalValue + reboundSell;
+  const reboundAvgCost = reboundShares > 0 ? (originalCost + reboundBuy) / reboundShares : 0;
 
   scenarioRows = [...upRows, ...downRows, ...reboundRows];
+  scenarioSkipRows = buildScenarioSkipRows(acct, grids, { up: upRows, down: downRows, rebound: reboundRows }, lower);
   els.upProfit.textContent = money(upProfit);
-  els.downCash.textContent = money(downCash);
-  els.downLoss.textContent = money(downLoss);
+  const upProfitCard = els.upProfit.closest(".metric");
+  setMetricNote(upProfitCard, `${qty(acct.holdingShares)} 股 -> ${qty(upShares)} 股 · 最终金额 ${money(upFinalTotal)}`);
+  const downCashCard = els.downCash.closest(".metric");
+  const downLossCard = els.downLoss.closest(".metric");
+  downCashCard.querySelector("span").textContent = "原始持仓金额";
+  downLossCard.querySelector("span").textContent = "最终金额";
+  els.downCash.textContent = money(originalCost);
+  els.downLoss.textContent = money(downValue);
+  setMetricNote(downCashCard, `${qty(acct.holdingShares)} 股 · 原始成本 ${money(acct.costPrice)}`);
+  setMetricNote(downLossCard, `${qty(downShares)} 股 · 最终成本 ${money(downAvgCost)}`);
   els.reboundProfit.textContent = money(reboundProfit);
-  els.upBox.innerHTML = boxRows([["到达价格", money(upper)], ["卖出现金", money(upCash)], ["剩余股数", `${qty(upShares)} 股`], ["剩余市值", money(upFinal)], ["总体收益", money(upProfit)]]);
-  els.downBox.innerHTML = boxRows([["到达价格", money(lower)], ["总体补仓金额", money(downCash)], ["可用现金不足还需", money(Math.max(0, downCash - acct.cash))], ["最终股数", `${qty(downShares)} 股`], ["总体亏损", money(downLoss)]]);
-  els.reboundBox.innerHTML = boxRows([["先跌到", money(lower)], ["再涨到", money(upper)], ["补仓金额", money(reboundBuy)], ["卖出现金", money(reboundSell)], ["总体盈利", money(reboundProfit)]]);
+  const reboundProfitCard = els.reboundProfit.closest(".metric");
+  setMetricNote(reboundProfitCard, `${qty(reboundShares)} 股 · 最终金额 ${money(reboundFinalTotal)}`);
+  els.upBox.innerHTML = boxRows([
+    ["到达价格", money(upper)],
+    ["原始持仓金额", money(originalCost), `${qty(acct.holdingShares)} 股 · 原始成本 ${money(acct.costPrice)}`],
+    ["卖出现金", money(upCash)],
+    ["最终金额", money(upFinalTotal), `${qty(upShares)} 股 · 到达价格 ${money(upper)}`],
+    ["总体收益", money(upProfit)],
+  ]);
+  els.downBox.innerHTML = boxRows([
+    ["到达价格", money(lower)],
+    ["原始持仓金额", money(originalCost), `${qty(acct.holdingShares)} 股 · 原始成本 ${money(acct.costPrice)}`],
+    ["总体补仓金额", money(downCash)],
+    ["最终金额", money(downValue), `${qty(downShares)} 股 · 最终成本 ${money(downAvgCost)}`],
+    ["总体亏损", money(downLoss)],
+  ]);
+  els.reboundBox.innerHTML = boxRows([
+    ["先跌到", money(lower)],
+    ["再涨到", money(upper)],
+    ["原始持仓金额", money(originalCost), `${qty(acct.holdingShares)} 股 · 原始成本 ${money(acct.costPrice)}`],
+    ["补仓金额", money(reboundBuy)],
+    ["卖出现金", money(reboundSell)],
+    ["最终金额", money(reboundFinalTotal), `${qty(reboundShares)} 股 · 最终成本 ${money(reboundAvgCost)}`],
+    ["总体盈利", money(reboundProfit)],
+  ]);
   renderScenarioDetails();
   els.status.textContent = `${acct.symbol} 已完成三种情形推演。`;
   saveState();
 }
 
 function boxRows(rows) {
-  return rows.map(([label, value]) => `<div><span>${label}</span><strong>${value}</strong></div>`).join("");
+  return rows.map(([label, value, detail]) => `<div><span>${label}${detail ? `<em>${detail}</em>` : ""}</span><strong>${value}</strong></div>`).join("");
+}
+
+function setMetricNote(metric, note) {
+  let noteEl = metric.querySelector("em.metric-note");
+  if (!noteEl) {
+    noteEl = document.createElement("em");
+    noteEl.className = "metric-note";
+    metric.appendChild(noteEl);
+  }
+  noteEl.textContent = note;
 }
 
 async function loadSymbolData() {

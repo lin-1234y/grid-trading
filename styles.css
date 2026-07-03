@@ -561,6 +561,16 @@ p {
   font-family: var(--font-number);
 }
 
+.metric-note {
+  display: block;
+  margin-top: 7px;
+  color: #9be7ff;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
 .metric.danger strong {
   color: #ff8f80;
 }
@@ -706,6 +716,18 @@ p {
   background: linear-gradient(135deg, rgba(34, 211, 238, 0.16), rgba(155, 108, 255, 0.14));
   color: #67e8f9;
   font-weight: 850;
+}
+
+.scenario-skip-row {
+  background:
+    linear-gradient(135deg, rgba(255, 209, 102, 0.10), rgba(15, 23, 42, 0.94) 52%, rgba(82, 92, 122, 0.10));
+  color: #b8c7df;
+}
+
+.scenario-skip-row .tag-cell {
+  border-color: rgba(255, 209, 102, 0.28);
+  background: rgba(255, 209, 102, 0.08);
+  color: #ffe08a;
 }
 
 #tradeFlowRows .side-cell.side-buy {
@@ -858,13 +880,69 @@ p {
 
 .grid-card {
   display: grid;
-  gap: 14px;
+  gap: 10px;
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background:
     linear-gradient(135deg, rgba(17, 28, 46, 0.96), rgba(11, 18, 32, 0.96) 52%, rgba(255, 122, 24, 0.08));
   box-shadow: var(--shadow-soft);
+}
+
+.grid-config-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.grid-config-form > section {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 8px;
+  background: rgba(5, 9, 20, 0.52);
+}
+
+.grid-config-form h4 {
+  margin: 0;
+  color: #ffd166;
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.grid-range-section {
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.grid-range-section h4 {
+  grid-column: 1 / -1;
+}
+
+.grid-side-section.buy {
+  border-color: rgba(255, 132, 150, 0.28);
+  background: linear-gradient(135deg, rgba(255, 92, 107, 0.12), rgba(5, 9, 20, 0.72));
+}
+
+.grid-side-section.sell {
+  border-color: rgba(34, 211, 238, 0.28);
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.12), rgba(5, 9, 20, 0.72));
+}
+
+.grid-config-form .field {
+  gap: 5px;
+}
+
+.grid-config-form .field span {
+  font-size: 11px;
+}
+
+.grid-config-form input,
+.grid-config-form select {
+  min-height: 38px;
+  padding: 0 10px;
 }
 
 .grid-card-head {
@@ -905,6 +983,15 @@ p {
 .result-box span {
   color: var(--muted);
   font-size: 13px;
+}
+
+.result-box span em {
+  display: block;
+  margin-top: 4px;
+  color: #9be7ff;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 1.35;
 }
 
 .result-box strong {
@@ -2470,6 +2557,19 @@ tbody tr:hover {
     grid-template-columns: 1fr;
   }
 
+  .grid-card .grid-config-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .grid-card .grid-range-section {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .grid-card .grid-side-section {
+    grid-template-columns: 1fr;
+  }
+
   #queryWindow .query-date-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2819,7 +2919,22 @@ tbody tr:hover {
   }
 
   .grid-card {
-    padding: 12px;
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .grid-config-form {
+    gap: 7px;
+  }
+
+  .grid-config-form > section {
+    padding: 8px;
+    gap: 6px;
+  }
+
+  .grid-config-form input,
+  .grid-config-form select {
+    min-height: 35px;
   }
 
   button {
