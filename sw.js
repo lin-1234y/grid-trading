@@ -1,9 +1,9 @@
-const CACHE_NAME = "grid-trading-v92";
+const CACHE_NAME = "grid-trading-v93";
 const ASSETS = [
   "./",
   "./index.html",
-  "./styles.css",
-  "./script.js",
+  "./styles.css?v=93",
+  "./script.js?v=93",
   "./manifest.webmanifest",
   "./icon.svg",
   "./apple-touch-icon.png",
