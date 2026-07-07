@@ -2160,7 +2160,7 @@ function renderAllProfitModal() {
     ["匹配次数", `${rows.reduce((sum, row) => sum + row.count, 0)} 组`],
   ].map(([label, value]) => `<article><span>${label}</span><strong class="${label.includes("盈亏") ? profitClass(totalProfit) : ""}">${value}</strong></article>`).join("");
   els.allProfitModalRows.innerHTML = rows.length ? rows.map((row) => `
-    <tr>
+    <tr class="all-profit-row">
       ${cell("代码/名称", symbolNameHtml(row.symbol, row.name), "symbol-cell")}
       ${cell("状态", `<span class="status-pill ${row.position.isCleared ? "cleared" : ""}">${row.position.label}</span><small>${qty(Math.abs(row.position.estimatedShares))} 股</small>`, "tag-cell")}
       ${cell("匹配盈亏", `<strong class="${profitClass(row.profit)}">${plainInteger(row.profit)}</strong>`, "profit-cell")}

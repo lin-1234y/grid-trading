@@ -1590,6 +1590,15 @@ p {
   line-height: 1.1;
 }
 
+.all-profit-row .profit-cell {
+  align-items: stretch;
+}
+
+.all-profit-row .profit-cell strong {
+  width: 100%;
+  text-align: left;
+}
+
 .calendar-period-symbol-row .period-detail-cell {
   min-width: 260px;
 }
@@ -2870,6 +2879,40 @@ tbody tr:hover {
 
   #calendarPeriodRows .period-detail-cell::before {
     margin-bottom: 4px;
+  }
+
+  #allProfitModalRows tr {
+    grid-template-columns: 1.05fr 0.78fr 1.18fr 0.86fr 1fr;
+    grid-template-areas:
+      "symbol status profit profit profit"
+      "symbol fee shares amount count";
+    grid-auto-rows: minmax(30px, auto);
+    align-items: stretch;
+  }
+
+  #allProfitModalRows .symbol-cell { grid-area: symbol; }
+  #allProfitModalRows .tag-cell { grid-area: status; }
+  #allProfitModalRows .profit-cell {
+    grid-area: profit;
+    justify-content: stretch;
+    min-width: 0;
+  }
+  #allProfitModalRows .shares-cell { grid-area: shares; }
+  #allProfitModalRows .amount-cell { grid-area: amount; }
+  #allProfitModalRows .fee-cell { grid-area: fee; }
+  #allProfitModalRows .count-cell { grid-area: count; }
+
+  #allProfitModalRows .profit-cell::before {
+    margin-bottom: 3px;
+  }
+
+  #allProfitModalRows .profit-cell strong {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    padding: 8px 12px;
+    font-size: 24px;
+    text-align: left;
   }
 
   .period-match-detail-list {
