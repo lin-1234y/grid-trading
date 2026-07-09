@@ -3169,6 +3169,8 @@ tbody tr:hover {
   border-radius: 8px;
   background: rgba(3, 7, 18, 0.74);
   overflow: hidden;
+  touch-action: none;
+  user-select: none;
 }
 
 .local-review-chart svg {

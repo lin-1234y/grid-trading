@@ -2616,6 +2616,36 @@ function showLocalReviewTooltipForTarget(target, event) {
   return true;
 }
 
+function localReviewNearestHit(event) {
+  const chart = event?.target?.closest?.("#localReviewChart") || document.querySelector("#localReviewChart");
+  if (!chart) return null;
+  const pointer = event?.touches?.[0] || event?.changedTouches?.[0] || event || {};
+  const clientX = Number(pointer.clientX);
+  if (!Number.isFinite(clientX)) return null;
+  const hits = [...chart.querySelectorAll("[data-local-review-date]")];
+  if (!hits.length) return null;
+  return hits.reduce((best, hit) => {
+    const rect = hit.getBoundingClientRect();
+    const center = rect.left + rect.width / 2;
+    const distance = Math.abs(center - clientX);
+    return !best || distance < best.distance ? { hit, distance } : best;
+  }, null)?.hit || null;
+}
+
+function updateLocalReviewFromPointer(event) {
+  if (!localReviewData) return false;
+  const hit = localReviewNearestHit(event);
+  if (!hit) return showLocalReviewTooltipForTarget(event.target, event);
+  showLocalReviewTooltipFromText(hit.dataset.localReviewTooltip || "", event);
+  const date = hit.dataset.localReviewDate || "";
+  if (date && date !== localReviewSelectedDate) {
+    localReviewSelectedDate = date;
+    const detail = document.querySelector("#localReviewDetail");
+    if (detail) detail.innerHTML = renderLocalReviewDetail(localReviewData, date);
+  }
+  return true;
+}
+
 function renderLocalReviewDetail(data, date = "") {
   const visibleRows = localReviewVisibleRows(data);
   const row = visibleRows.find((item) => item.date === date) || visibleRows.at(-1) || data.rows.at(-1);
@@ -2911,10 +2941,7 @@ document.addEventListener("click", (event) => {
   }
   const localReviewHit = event.target.closest("[data-local-review-date]");
   if (localReviewHit && localReviewData) {
-    const tooltipText = localReviewHit.dataset.localReviewTooltip || "";
-    localReviewSelectedDate = localReviewHit.dataset.localReviewDate || "";
-    renderLocalReviewModal(localReviewData);
-    if (tooltipText) requestAnimationFrame(() => showLocalReviewTooltipFromText(tooltipText, event));
+    updateLocalReviewFromPointer(event);
   }
   const viewButton = event.target.closest("#clearedModal [data-action='view-symbol']");
   if (viewButton) {
@@ -3048,14 +3075,18 @@ els.clearedSearch?.addEventListener("input", renderClearedModal);
 
 document.addEventListener("pointermove", (event) => {
   if (event.target.closest?.("#localReviewChart")) {
-    showLocalReviewTooltipForTarget(event.target, event);
+    event.preventDefault();
+    updateLocalReviewFromPointer(event);
   }
-});
+}, { passive: false });
 document.addEventListener("pointerdown", (event) => {
-  if (event.target.closest?.("#localReviewChart")) {
-    showLocalReviewTooltipForTarget(event.target, event);
+  const chart = event.target.closest?.("#localReviewChart");
+  if (chart) {
+    event.preventDefault();
+    chart.setPointerCapture?.(event.pointerId);
+    updateLocalReviewFromPointer(event);
   }
-});
+}, { passive: false });
 document.addEventListener("pointerout", (event) => {
   if (event.target.closest?.("#localReviewChart") && !event.relatedTarget?.closest?.("#localReviewChart")) {
     hideLocalReviewTooltip();
