@@ -204,8 +204,8 @@ function ensureLocalReviewModal() {
           <label><span>拉轴位置</span><input id="localReviewPanInput" type="range" min="0" max="0" value="0"></label>
           <em id="localReviewAxisLabel">显示全部本地日期</em>
         </div>
-        <div id="localReviewSummary" class="local-review-summary"></div>
         <div id="localReviewChart" class="local-review-chart"></div>
+        <div id="localReviewSummary" class="local-review-summary"></div>
         <div id="localReviewDetail" class="local-review-detail"></div>
       </section>
     </div>
@@ -2566,6 +2566,7 @@ function renderLocalReviewChart(data, selectedDate = "") {
       <text x="${pad.left}" y="${height - 12}" class="local-review-date-label">${esc(rows[0].date.slice(5))}</text>
       <text x="${width - pad.right - 42}" y="${height - 12}" class="local-review-date-label">${esc(rows.at(-1).date.slice(5))}</text>
     </svg>
+    <div id="localReviewLocator" class="local-review-locator" hidden></div>
     <div id="localReviewTooltip" class="local-review-tooltip" hidden></div>
   `;
 }
@@ -2578,14 +2579,18 @@ function localReviewTooltipLines(text = "") {
 function showLocalReviewTooltipFromText(text, event) {
   const chart = document.querySelector("#localReviewChart");
   const tooltip = chart?.querySelector("#localReviewTooltip");
+  const locator = chart?.querySelector("#localReviewLocator");
   if (!chart || !tooltip || !text) return;
   const lines = localReviewTooltipLines(text);
   tooltip.innerHTML = lines.map((line, index) => `<span class="${index === 0 ? "main" : ""}">${esc(line)}</span>`).join("");
   tooltip.hidden = false;
+  if (locator) locator.hidden = false;
   const rect = chart.getBoundingClientRect();
   const pointer = event?.touches?.[0] || event?.changedTouches?.[0] || event || {};
   const clientX = Number(pointer.clientX ?? (rect.left + rect.width / 2));
   const clientY = Number(pointer.clientY ?? (rect.top + rect.height / 2));
+  const locateX = Math.max(0, Math.min(rect.width, clientX - rect.left));
+  if (locator) locator.style.left = `${locateX}px`;
   const width = tooltip.offsetWidth || 220;
   const height = tooltip.offsetHeight || 92;
   const left = Math.max(8, Math.min(rect.width - width - 8, clientX - rect.left + 12));
@@ -2596,7 +2601,9 @@ function showLocalReviewTooltipFromText(text, event) {
 
 function hideLocalReviewTooltip() {
   const tooltip = document.querySelector("#localReviewTooltip");
+  const locator = document.querySelector("#localReviewLocator");
   if (tooltip) tooltip.hidden = true;
+  if (locator) locator.hidden = true;
 }
 
 function showLocalReviewTooltipForTarget(target, event) {

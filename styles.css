@@ -3232,6 +3232,31 @@ tbody tr:hover {
 .local-review-match-pin.active { fill: #20e6c7; stroke: #fff2a8; stroke-width: 2; }
 .local-review-hit { fill: transparent; cursor: pointer; }
 
+.local-review-locator {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  z-index: 7;
+  transform: translateX(-1px);
+  background: linear-gradient(180deg, rgba(255, 209, 102, 0), rgba(255, 209, 102, 0.96), rgba(34, 211, 238, 0.88), rgba(255, 209, 102, 0));
+  box-shadow: 0 0 12px rgba(255, 209, 102, 0.65), 0 0 22px rgba(34, 211, 238, 0.38);
+  pointer-events: none;
+}
+
+.local-review-locator::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: #ffd166;
+  box-shadow: 0 0 14px rgba(255, 209, 102, 0.9);
+}
+
 .local-review-tooltip {
   position: absolute;
   z-index: 8;
