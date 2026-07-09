@@ -2503,6 +2503,17 @@ function renderLocalReviewChart(data, selectedDate = "") {
   }).join("");
   const closeLine = rows.map((row, index) => `${xFor(index)},${yFor(row.close)}`).join(" ");
   const costLine = rows.filter((row) => Number(row.snapshot.currentCost) > 0).map((row) => `${xFor(rows.indexOf(row))},${yFor(row.snapshot.currentCost)}`).join(" ");
+  const tooltipText = (lines) => esc(lines.filter(Boolean).join("\n"));
+  const tooltipAttr = (lines) => `data-local-review-tooltip="${tooltipText(lines)}"`;
+  const dayTooltip = (row) => tooltipAttr([
+    row.date,
+    `\u6536\u76d8 ${priceText(row.close)} \u00b7 \u6210\u672c ${row.snapshot.currentCost ? priceText(row.snapshot.currentCost) : "-"}`,
+    `\u6301\u4ed3 ${qty(row.snapshot.shares || 0)} \u80a1`,
+    row.buy?.count ? `\u4e70\u5165 ${qty(row.buy.shares)} \u80a1 \u00b7 \u5747\u4ef7 ${priceText(row.buy.avg)} \u00b7 ${money(row.buy.amount)}` : "",
+    row.sell?.count ? `\u5356\u51fa ${qty(row.sell.shares)} \u80a1 \u00b7 \u5747\u4ef7 ${priceText(row.sell.avg)} \u00b7 ${money(row.sell.amount)}` : "",
+    row.matches.length ? `\u5339\u914d ${qty(row.matches.reduce((sum, item) => sum + Number(item.shares || 0), 0))} \u80a1 \u00b7 \u76c8\u4e8f ${money(row.matches.reduce((sum, item) => sum + Number(item.profit || 0), 0))}` : "",
+    row.events.length ? `\u5206\u7ea2\u9001\u80a1 ${qty(row.events.length)} \u6761` : "",
+  ]);
   const unmatchedLots = data.unmatched || [];
   const point = (row, index, side) => {
     const agg = row[side];
@@ -2520,16 +2531,25 @@ function renderLocalReviewChart(data, selectedDate = "") {
     const text = `${label}${isUnmatched ? "未" : ""}`;
     const tx = x - (isUnmatched ? 20 : 14);
     const ty = side === "buy" ? y + 18 : y - 8;
+    const unmatchedShares = relatedUnmatched.reduce((sum, lot) => sum + Number(lot.remaining || 0), 0);
+    const unmatchedAmount = relatedUnmatched.reduce((sum, lot) => sum + Number(lot.remaining || 0) * Number(lot.price || 0), 0);
+    const pointTitle = tooltipAttr([
+      row.date,
+      `${side === "buy" ? "\u4e70\u5165" : "\u5356\u51fa"} \u00b7 ${qty(agg.count)} \u7b14`,
+      `\u80a1\u6570 ${qty(agg.shares)} \u80a1`,
+      `\u5747\u4ef7 ${priceText(agg.avg)} \u00b7 \u91d1\u989d ${money(agg.amount)}`,
+      isUnmatched ? `\u672a\u5339\u914d ${qty(unmatchedShares)} \u80a1 \u00b7 \u5747\u4ef7 ${unmatchedShares ? priceText(unmatchedAmount / unmatchedShares) : "-"}` : "",
+    ]);
     const highlight = isUnmatched ? `
-      <g class="local-review-unmatched-hit ${side}">
+      <g class="local-review-unmatched-hit ${side}" ${pointTitle}>
         <circle cx="${x}" cy="${y}" r="14" />
         <rect x="${tx - 4}" y="${ty - 15}" width="${Math.max(38, text.length * 12)}" height="19" rx="5" />
       </g>` : "";
-    return `${highlight}<text class="local-review-point ${side}${isUnmatched ? " unmatched" : ""}" x="${tx}" y="${ty}">${text}</text>`;
+    return `${highlight}<text class="local-review-point ${side}${isUnmatched ? " unmatched" : ""}" ${pointTitle} x="${tx}" y="${ty}">${text}</text>`;
   };
-  const matchPins = rows.map((row, index) => row.matches.length ? `<circle class="local-review-match-pin ${row.date === selectedDate ? "active" : ""}" cx="${xFor(index)}" cy="${yFor(row.close)}" r="${row.date === selectedDate ? 8 : 5}" />` : "").join("");
-  const events = rows.map((row, index) => row.events.length ? `<text class="local-review-event" x="${xFor(index) - 6}" y="${pad.top + 12}">◆</text>` : "").join("");
-  const hitAreas = rows.map((row, index) => `<rect class="local-review-hit" data-local-review-date="${esc(row.date)}" x="${xFor(index) - Math.max(12, plotW / rows.length / 2)}" y="${pad.top}" width="${Math.max(24, plotW / rows.length)}" height="${plotH}" />`).join("");
+  const matchPins = rows.map((row, index) => row.matches.length ? `<circle class="local-review-match-pin ${row.date === selectedDate ? "active" : ""}" ${tooltipAttr([row.date, `\u5339\u914d ${qty(row.matches.reduce((sum, item) => sum + Number(item.shares || 0), 0))} \u80a1`, `\u76c8\u4e8f ${money(row.matches.reduce((sum, item) => sum + Number(item.profit || 0), 0))}`, `\u6210\u4ea4\u989d ${money(row.matches.reduce((sum, item) => sum + Number(item.amount || 0), 0))}`])} cx="${xFor(index)}" cy="${yFor(row.close)}" r="${row.date === selectedDate ? 8 : 5}" />` : "").join("");
+  const events = rows.map((row, index) => row.events.length ? `<text class="local-review-event" ${tooltipAttr([row.date, `\u5206\u7ea2\u9001\u80a1 ${qty(row.events.length)} \u6761`])} x="${xFor(index) - 6}" y="${pad.top + 12}">\u25c6</text>` : "").join("");
+  const hitAreas = rows.map((row, index) => `<rect class="local-review-hit" ${dayTooltip(row)} data-local-review-date="${esc(row.date)}" x="${xFor(index) - Math.max(12, plotW / rows.length / 2)}" y="${pad.top}" width="${Math.max(24, plotW / rows.length)}" height="${plotH}" />`).join("");
   return `
     <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(data.name || data.symbol)} 无K线交易复盘图">
       <rect x="0" y="0" width="${width}" height="${height}" class="local-review-bg" />
@@ -2538,15 +2558,55 @@ function renderLocalReviewChart(data, selectedDate = "") {
       ${bars}
       <polyline class="local-review-price-line" points="${closeLine}" />
       ${costLine ? `<polyline class="local-review-cost-line" points="${costLine}" />` : ""}
+      ${hitAreas}
       ${rows.map((row, index) => point(row, index, "buy")).join("")}
       ${rows.map((row, index) => point(row, index, "sell")).join("")}
       ${events}
       ${matchPins}
       <text x="${pad.left}" y="${height - 12}" class="local-review-date-label">${esc(rows[0].date.slice(5))}</text>
       <text x="${width - pad.right - 42}" y="${height - 12}" class="local-review-date-label">${esc(rows.at(-1).date.slice(5))}</text>
-      ${hitAreas}
     </svg>
+    <div id="localReviewTooltip" class="local-review-tooltip" hidden></div>
   `;
+}
+
+
+function localReviewTooltipLines(text = "") {
+  return String(text || "").split("\n").filter(Boolean);
+}
+
+function showLocalReviewTooltipFromText(text, event) {
+  const chart = document.querySelector("#localReviewChart");
+  const tooltip = chart?.querySelector("#localReviewTooltip");
+  if (!chart || !tooltip || !text) return;
+  const lines = localReviewTooltipLines(text);
+  tooltip.innerHTML = lines.map((line, index) => `<span class="${index === 0 ? "main" : ""}">${esc(line)}</span>`).join("");
+  tooltip.hidden = false;
+  const rect = chart.getBoundingClientRect();
+  const pointer = event?.touches?.[0] || event?.changedTouches?.[0] || event || {};
+  const clientX = Number(pointer.clientX ?? (rect.left + rect.width / 2));
+  const clientY = Number(pointer.clientY ?? (rect.top + rect.height / 2));
+  const width = tooltip.offsetWidth || 220;
+  const height = tooltip.offsetHeight || 92;
+  const left = Math.max(8, Math.min(rect.width - width - 8, clientX - rect.left + 12));
+  const top = Math.max(8, Math.min(rect.height - height - 8, clientY - rect.top - height - 12));
+  tooltip.style.left = `${left}px`;
+  tooltip.style.top = `${top}px`;
+}
+
+function hideLocalReviewTooltip() {
+  const tooltip = document.querySelector("#localReviewTooltip");
+  if (tooltip) tooltip.hidden = true;
+}
+
+function showLocalReviewTooltipForTarget(target, event) {
+  const tooltipTarget = target?.closest?.("[data-local-review-tooltip]");
+  if (!tooltipTarget) {
+    hideLocalReviewTooltip();
+    return false;
+  }
+  showLocalReviewTooltipFromText(tooltipTarget.dataset.localReviewTooltip || "", event);
+  return true;
 }
 
 function renderLocalReviewDetail(data, date = "") {
@@ -2844,8 +2904,10 @@ document.addEventListener("click", (event) => {
   }
   const localReviewHit = event.target.closest("[data-local-review-date]");
   if (localReviewHit && localReviewData) {
+    const tooltipText = localReviewHit.dataset.localReviewTooltip || "";
     localReviewSelectedDate = localReviewHit.dataset.localReviewDate || "";
     renderLocalReviewModal(localReviewData);
+    if (tooltipText) requestAnimationFrame(() => showLocalReviewTooltipFromText(tooltipText, event));
   }
   const viewButton = event.target.closest("#clearedModal [data-action='view-symbol']");
   if (viewButton) {
@@ -2976,6 +3038,22 @@ document.addEventListener("input", (event) => {
   }
 });
 els.clearedSearch?.addEventListener("input", renderClearedModal);
+
+document.addEventListener("pointermove", (event) => {
+  if (event.target.closest?.("#localReviewChart")) {
+    showLocalReviewTooltipForTarget(event.target, event);
+  }
+});
+document.addEventListener("pointerdown", (event) => {
+  if (event.target.closest?.("#localReviewChart")) {
+    showLocalReviewTooltipForTarget(event.target, event);
+  }
+});
+document.addEventListener("pointerout", (event) => {
+  if (event.target.closest?.("#localReviewChart") && !event.relatedTarget?.closest?.("#localReviewChart")) {
+    hideLocalReviewTooltip();
+  }
+});
 els.exportBackup.addEventListener("click", exportBackup);
 els.importBackup.addEventListener("click", () => {
   els.importBackup.value = "";
