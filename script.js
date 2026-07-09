@@ -132,6 +132,10 @@ let matchedCalendarAggregateBySymbol = false;
 let calendarPeriodBaseRows = [];
 let calendarPeriodFilterSymbol = "";
 let calendarPeriodTitleText = "";
+let localReviewData = null;
+let localReviewSelectedDate = "";
+let localReviewWindowStart = 0;
+let localReviewWindowSize = 0;
 let overviewRowsCache = [];
 let saveTimer = 0;
 let flowFilterSymbol = "";
@@ -162,6 +166,51 @@ const STOCK_NAME_MAP = {
   "601766": "中国中车",
 };
 
+function ensureLocalReviewModal() {
+  const queryPanel = document.querySelector("#queryWindow .compact-query-panel .symbol-filter");
+  if (queryPanel && !document.querySelector("#openLocalReviewButton")) {
+    queryPanel.insertAdjacentHTML("beforeend", `
+      <button id="openLocalReviewButton" class="local-review-entry" type="button">无K线复盘</button>
+    `);
+  }
+  if (document.querySelector("#localReviewModal")) return;
+  document.body.insertAdjacentHTML("beforeend", `
+    <div id="localReviewModal" class="modal" hidden>
+      <div class="modal-backdrop" data-close-local-review></div>
+      <section class="modal-card local-review-modal-card" role="dialog" aria-modal="true" aria-labelledby="localReviewTitle">
+        <div class="modal-title">
+          <div>
+            <h2 id="localReviewTitle">无K线交易复盘</h2>
+            <span id="localReviewSubtitle">使用本地交易、匹配、成本与分红送股生成</span>
+          </div>
+          <button id="closeLocalReviewModal" class="icon-button" type="button">×</button>
+        </div>
+        <p id="localReviewStatus" class="local-review-status">未加载行情。</p>
+        <div class="local-review-legend">
+          <span><i class="legend-bar"></i>magenta柱：仓位</span>
+          <span><i class="legend-cost"></i>黄色曲线：成本</span>
+          <span><i class="legend-buy"></i>▲ 买入</span>
+          <span><i class="legend-sell"></i>▼ 卖出</span>
+          <span><i class="legend-event"></i>◆ 分红送股</span>
+        </div>
+        <div class="local-review-controls">
+          <label class="field"><span>区间开始</span><input id="localReviewStartInput" type="date"></label>
+          <label class="field"><span>区间结束</span><input id="localReviewEndInput" type="date"></label>
+          <button id="applyLocalReviewRange" type="button">应用区间</button>
+          <button id="resetLocalReviewRange" class="ghost-button" type="button">显示全部</button>
+        </div>
+                <div class="local-review-axis-controls">
+          <label><span>缩放日期数</span><input id="localReviewZoomInput" type="range" min="1" max="1" value="1"></label>
+          <label><span>拉轴位置</span><input id="localReviewPanInput" type="range" min="0" max="0" value="0"></label>
+          <em id="localReviewAxisLabel">显示全部本地日期</em>
+        </div>
+        <div id="localReviewSummary" class="local-review-summary"></div>
+        <div id="localReviewChart" class="local-review-chart"></div>
+        <div id="localReviewDetail" class="local-review-detail"></div>
+      </section>
+    </div>
+  `);
+}
 function ensureMatchedDetailModal() {
   const matchedPanel = document.querySelector("#matchedRows")?.closest(".panel");
   if (matchedPanel && !document.querySelector("#openMatchedModal")) {
@@ -2219,6 +2268,367 @@ function renderQuery() {
   els.unmatchedRows.innerHTML = renderUnmatchedGroups(unmatched);
 }
 
+function defaultReviewRange(symbol) {
+  const code = normalizeSymbol(symbol);
+  const dates = trades
+    .filter((trade) => trade.symbol === code)
+    .map((trade) => trade.date)
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
+  return { start: dates[0] || todayIso(), end: dates.at(-1) || todayIso() };
+}
+
+function localReviewBounds(symbol, start = "", end = "") {
+  const fallback = defaultReviewRange(symbol);
+  return { start: start || fallback.start, end: end || fallback.end };
+}
+
+function positionSnapshotForDate(symbol, date, matchedProfit = 0) {
+  const code = normalizeSymbol(symbol);
+  const rows = trades
+    .filter((trade) => trade.symbol === code && trade.date <= date)
+    .sort((a, b) => `${a.date}-${a.createdAt || 0}`.localeCompare(`${b.date}-${b.createdAt || 0}`));
+  const { unmatched } = matchTrades(rows, date);
+  const openBuy = unmatched.filter((row) => row.side === "buy").reduce((sum, row) => sum + row.remaining, 0);
+  const openSell = unmatched.filter((row) => row.side === "sell").reduce((sum, row) => sum + row.remaining, 0);
+  const pos = adjustedOriginalPosition(code, date);
+  const baseShares = Number(pos?.shares || 0);
+  const shares = baseShares + openBuy - openSell;
+  const totalBuyAmount = rows.filter((row) => row.side === "buy").reduce((sum, row) => sum + Number(row.amount || row.price * row.shares || 0), 0);
+  const totalSellAmount = rows.filter((row) => row.side === "sell").reduce((sum, row) => sum + Number(row.amount || row.price * row.shares || 0), 0);
+  const firstTradeCost = firstTradePriceForSymbol(code);
+  const hasKnownCost = Boolean(pos?.hasPosition && Number(pos.cost || 0) > 0);
+  const originalCost = hasKnownCost ? Number(pos.cost || 0) : firstTradeCost;
+  const matchedProfitToDate = allMatchedRowsForSymbol(code)
+    .filter((row) => matchedEventDate(row) <= date)
+    .reduce((sum, row) => sum + Number(row.profit || 0), 0);
+  const currentCost = shares > 0
+    ? (hasKnownCost
+      ? ((originalCost * baseShares) + totalBuyAmount - totalSellAmount) / shares
+      : (originalCost ? originalCost - (matchedProfitToDate / shares) : null))
+    : (originalCost || null);
+  const costChange = currentCost === null ? null : (originalCost ? currentCost - originalCost : null);
+  return { shares, currentCost, costChange, hasKnownCost, originalCost, openBuy, openSell, unmatched, matchedProfit };
+}
+
+function aggregateTradesForReview(rows, side) {
+  const filtered = rows.filter((row) => row.side === side);
+  const shares = filtered.reduce((sum, row) => sum + row.shares, 0);
+  const amount = filtered.reduce((sum, row) => sum + Number(row.amount || row.price * row.shares || 0), 0);
+  return { count: filtered.length, shares, amount, avg: shares ? amount / shares : 0 };
+}
+
+function localReviewMatchedForDate(matches, date) {
+  return matches.filter((row) => matchedEventDate(row) === date);
+}
+
+function firstTradePriceForSymbol(symbol) {
+  const first = trades
+    .filter((trade) => trade.symbol === normalizeSymbol(symbol) && Number(trade.price || 0) > 0)
+    .sort((a, b) => `${a.date}-${a.createdAt || 0}`.localeCompare(`${b.date}-${b.createdAt || 0}`))[0];
+  return Number(first?.price || 0);
+}
+
+function normalizeLocalReviewWindow(data) {
+  const total = data?.rows?.length || 0;
+  if (!total) {
+    localReviewWindowStart = 0;
+    localReviewWindowSize = 0;
+    return;
+  }
+  if (!localReviewWindowSize || localReviewWindowSize > total) localReviewWindowSize = total;
+  localReviewWindowSize = Math.max(1, Math.min(total, Math.round(localReviewWindowSize)));
+  localReviewWindowStart = Math.max(0, Math.min(total - localReviewWindowSize, Math.round(localReviewWindowStart || 0)));
+}
+
+function localReviewVisibleRows(data) {
+  normalizeLocalReviewWindow(data);
+  if (!data?.rows?.length) return [];
+  return data.rows.slice(localReviewWindowStart, localReviewWindowStart + localReviewWindowSize);
+}
+
+function syncLocalReviewAxisControls(data) {
+  const zoom = document.querySelector("#localReviewZoomInput");
+  const pan = document.querySelector("#localReviewPanInput");
+  const label = document.querySelector("#localReviewAxisLabel");
+  const total = data?.rows?.length || 0;
+  normalizeLocalReviewWindow(data);
+  if (zoom) {
+    zoom.min = total ? "1" : "0";
+    zoom.max = String(Math.max(1, total));
+    zoom.value = String(localReviewWindowSize || total || 0);
+    zoom.disabled = total <= 1;
+  }
+  if (pan) {
+    pan.min = "0";
+    pan.max = String(Math.max(0, total - (localReviewWindowSize || total || 0)));
+    pan.value = String(localReviewWindowStart || 0);
+    pan.disabled = total <= 1 || Number(pan.max) <= 0;
+  }
+  if (label) {
+    const visible = localReviewVisibleRows(data);
+    label.textContent = visible.length && total
+      ? `显示 ${visible.length}/${total} 个本地日期 · ${visible[0].date} 至 ${visible.at(-1).date}`
+      : "没有可显示日期";
+  }
+}
+
+function buildLocalReviewData(symbol, start = "", end = "") {
+  const code = normalizeSymbol(symbol);
+  const { start: rangeStart, end: rangeEnd } = localReviewBounds(code, start, end);
+  const name = stockNameForSymbol(code) || tradeName(trades.find((trade) => trade.symbol === code) || {}) || "";
+  const symbolTrades = trades
+    .filter((trade) => trade.symbol === code)
+    .sort((a, b) => `${a.date}-${a.createdAt || 0}`.localeCompare(`${b.date}-${b.createdAt || 0}`));
+  const visibleTrades = symbolTrades.filter((trade) => isWithinDateRange(trade.date, rangeStart, rangeEnd));
+  const allMatches = allMatchedRowsForSymbol(code);
+  const visibleMatches = allMatches.filter((row) => isWithinDateRange(matchedEventDate(row), rangeStart, rangeEnd));
+  const visibleEvents = equityEventsForSymbol(code, rangeEnd).filter((event) => isWithinDateRange(event.date, rangeStart, rangeEnd));
+  const dateSet = new Set();
+  visibleTrades.forEach((trade) => dateSet.add(trade.date));
+  visibleMatches.forEach((row) => dateSet.add(matchedEventDate(row)));
+  visibleEvents.forEach((event) => dateSet.add(event.date));
+  const dates = [...dateSet].filter(Boolean).sort((a, b) => a.localeCompare(b));
+  const rows = dates.map((date) => {
+    const dayTrades = visibleTrades.filter((trade) => trade.date === date);
+    const prices = dayTrades.map((trade) => Number(trade.price || 0)).filter((value) => value > 0);
+    const dayMatches = localReviewMatchedForDate(visibleMatches, date);
+    const dayProfit = dayMatches.reduce((sum, row) => sum + row.profit, 0);
+    const snapshot = positionSnapshotForDate(code, date, dayProfit);
+    const fallbackPrice = prices.at(-1) || snapshot.currentCost || 0;
+    return {
+      date,
+      open: prices[0] || fallbackPrice,
+      high: prices.length ? Math.max(...prices) : fallbackPrice,
+      low: prices.length ? Math.min(...prices) : fallbackPrice,
+      close: prices.at(-1) || fallbackPrice,
+      trades: dayTrades,
+      buy: aggregateTradesForReview(dayTrades, "buy"),
+      sell: aggregateTradesForReview(dayTrades, "sell"),
+      matches: dayMatches,
+      events: visibleEvents.filter((event) => event.date === date),
+      snapshot,
+    };
+  });
+  const endRows = symbolTrades.filter((trade) => trade.date <= rangeEnd);
+  const endMatch = matchTrades(endRows, rangeEnd);
+  const unmatched = endMatch.unmatched;
+  const unmatchedBySide = (side) => {
+    const lots = unmatched.filter((row) => row.side === side);
+    const shares = lots.reduce((sum, row) => sum + Number(row.remaining || 0), 0);
+    const amount = lots.reduce((sum, row) => sum + Number(row.remaining || 0) * Number(row.price || 0), 0);
+    return { lots, shares, amount, avg: shares ? amount / shares : 0 };
+  };
+  const unmatchedBuySummary = unmatchedBySide("buy");
+  const unmatchedSellSummary = unmatchedBySide("sell");
+  const unmatchedBuy = unmatchedBuySummary.shares;
+  const unmatchedSell = unmatchedSellSummary.shares;
+  const unmatchedSide = unmatchedSell > 0 ? "待买回卖出" : unmatchedBuy > 0 ? "待卖出买入" : "无";
+  const unmatchedSummary = unmatchedSell > 0
+    ? { ...unmatchedSellSummary, label: "待买回卖出", side: "sell" }
+    : unmatchedBuy > 0
+      ? { ...unmatchedBuySummary, label: "待卖出买入", side: "buy" }
+      : { lots: [], shares: 0, amount: 0, avg: 0, label: "无", side: "flat" };
+  const matchedShares = visibleMatches.reduce((sum, row) => sum + Number(row.shares || 0), 0);
+  const matchedProfit = visibleMatches.reduce((sum, row) => sum + Number(row.profit || 0), 0);
+  const matchedAmount = visibleMatches.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  const matchedFee = visibleMatches.reduce((sum, row) => sum + Number(row.fee || 0), 0);
+  return {
+    symbol: code,
+    name,
+    start: rangeStart,
+    end: rangeEnd,
+    rows,
+    trades: visibleTrades,
+    matches: visibleMatches,
+    events: visibleEvents,
+    unmatched,
+    unmatchedSide,
+    unmatchedSummary,
+    buyPointCount: visibleTrades.filter((trade) => trade.side === "buy").length,
+    sellPointCount: visibleTrades.filter((trade) => trade.side === "sell").length,
+    matchedShares,
+    matchedProfit,
+    matchedAmount,
+    matchedFee,
+    profit: matchedProfit,
+    amount: matchedAmount,
+    fee: matchedFee,
+  };
+}
+
+function renderLocalReviewSummary(data) {
+  const latest = data.rows.at(-1)?.snapshot;
+  return `
+    <article><span>数据模式</span><strong>无K线复盘</strong></article>
+    <article><span>当前区间</span><strong>${esc(data.start)} 至 ${esc(data.end)}</strong></article>
+    <article><span>本地日期</span><strong>${qty(data.rows.length)} 天</strong></article>
+    <article><span>买点</span><strong>${qty(data.buyPointCount)}</strong></article>
+    <article><span>卖点</span><strong>${qty(data.sellPointCount)}</strong></article>
+    <article class="local-review-period-match"><span>区间匹配</span><strong>${qty(data.matchedShares || 0)} 股</strong><em>${money(data.matchedProfit || 0)} · ${money(data.matchedAmount || 0)}</em></article>
+    <article class="local-review-unmatched-summary"><span>未匹配</span><strong>${esc(data.unmatchedSummary?.label || data.unmatchedSide)} · ${qty(data.unmatchedSummary?.shares || 0)} 股</strong><em>均价 ${data.unmatchedSummary?.avg ? priceText(data.unmatchedSummary.avg) : "-"}</em></article>
+    <article><span>最新持仓</span><strong>${latest ? `${qty(latest.shares)} 股` : "-"}</strong></article>
+  `;
+}
+
+function renderLocalReviewChart(data, selectedDate = "") {
+  const rows = localReviewVisibleRows(data);
+  if (!rows.length) return `<div class="empty">这个区间没有本地交易、匹配或分红送股记录。</div>`;
+  const width = 760;
+  const height = 560;
+  const pad = { left: 54, right: 22, top: 24, bottom: 42 };
+  const plotW = width - pad.left - pad.right;
+  const plotH = height - pad.top - pad.bottom;
+  const prices = rows.flatMap((row) => [row.open, row.high, row.low, row.close, row.snapshot.currentCost]).filter((value) => Number(value) > 0);
+  if (!prices.length) prices.push(1);
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const span = Math.max(0.01, max - min);
+  const yMin = Math.max(0, min - span * 0.12);
+  const yMax = max + span * 0.12;
+  const xFor = (index) => pad.left + (rows.length <= 1 ? plotW / 2 : (index / (rows.length - 1)) * plotW);
+  const yFor = (value) => pad.top + ((yMax - Number(value || 0)) / (yMax - yMin)) * plotH;
+  const maxShares = Math.max(1, ...rows.map((row) => Math.max(0, Number(row.snapshot.shares || 0))));
+  const barW = Math.max(5, Math.min(18, plotW / Math.max(1, rows.length) * 0.7));
+  const baseY = height - pad.bottom;
+  const bars = rows.map((row, index) => {
+    const shares = Math.max(0, Number(row.snapshot.shares || 0));
+    const barH = Math.max(2, shares / maxShares * Math.min(62, plotH * 0.22));
+    return `<rect class="local-review-position-bar" x="${xFor(index) - barW / 2}" y="${baseY - barH}" width="${barW}" height="${barH}" />`;
+  }).join("");
+  const grid = [0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+    const y = pad.top + ratio * plotH;
+    const price = yMax - ratio * (yMax - yMin);
+    return `<line x1="${pad.left}" y1="${y}" x2="${width - pad.right}" y2="${y}" /><text x="8" y="${y + 4}">${priceText(price)}</text>`;
+  }).join("");
+  const closeLine = rows.map((row, index) => `${xFor(index)},${yFor(row.close)}`).join(" ");
+  const costLine = rows.filter((row) => Number(row.snapshot.currentCost) > 0).map((row) => `${xFor(rows.indexOf(row))},${yFor(row.snapshot.currentCost)}`).join(" ");
+  const unmatchedLots = data.unmatched || [];
+  const point = (row, index, side) => {
+    const agg = row[side];
+    if (!agg?.count) return "";
+    const price = agg.avg || row.close;
+    const x = xFor(index);
+    const y = yFor(price);
+    const relatedUnmatched = unmatchedLots.filter((lot) => {
+      if (lot.side !== side || lot.date !== row.date) return false;
+      const lotPrice = Number(lot.price || 0);
+      return !price || !lotPrice || Math.abs(lotPrice - price) <= Math.max(0.01, price * 0.006);
+    });
+    const isUnmatched = relatedUnmatched.length > 0;
+    const label = side === "buy" ? `▲买${agg.count > 1 ? `×${agg.count}` : ""}` : `▼卖${agg.count > 1 ? `×${agg.count}` : ""}`;
+    const text = `${label}${isUnmatched ? "未" : ""}`;
+    const tx = x - (isUnmatched ? 20 : 14);
+    const ty = side === "buy" ? y + 18 : y - 8;
+    const highlight = isUnmatched ? `
+      <g class="local-review-unmatched-hit ${side}">
+        <circle cx="${x}" cy="${y}" r="14" />
+        <rect x="${tx - 4}" y="${ty - 15}" width="${Math.max(38, text.length * 12)}" height="19" rx="5" />
+      </g>` : "";
+    return `${highlight}<text class="local-review-point ${side}${isUnmatched ? " unmatched" : ""}" x="${tx}" y="${ty}">${text}</text>`;
+  };
+  const matchPins = rows.map((row, index) => row.matches.length ? `<circle class="local-review-match-pin ${row.date === selectedDate ? "active" : ""}" cx="${xFor(index)}" cy="${yFor(row.close)}" r="${row.date === selectedDate ? 8 : 5}" />` : "").join("");
+  const events = rows.map((row, index) => row.events.length ? `<text class="local-review-event" x="${xFor(index) - 6}" y="${pad.top + 12}">◆</text>` : "").join("");
+  const hitAreas = rows.map((row, index) => `<rect class="local-review-hit" data-local-review-date="${esc(row.date)}" x="${xFor(index) - Math.max(12, plotW / rows.length / 2)}" y="${pad.top}" width="${Math.max(24, plotW / rows.length)}" height="${plotH}" />`).join("");
+  return `
+    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(data.name || data.symbol)} 无K线交易复盘图">
+      <rect x="0" y="0" width="${width}" height="${height}" class="local-review-bg" />
+      <g class="local-review-grid">${grid}</g>
+      <line x1="${pad.left}" y1="${baseY}" x2="${width - pad.right}" y2="${baseY}" class="local-review-axis" />
+      ${bars}
+      <polyline class="local-review-price-line" points="${closeLine}" />
+      ${costLine ? `<polyline class="local-review-cost-line" points="${costLine}" />` : ""}
+      ${rows.map((row, index) => point(row, index, "buy")).join("")}
+      ${rows.map((row, index) => point(row, index, "sell")).join("")}
+      ${events}
+      ${matchPins}
+      <text x="${pad.left}" y="${height - 12}" class="local-review-date-label">${esc(rows[0].date.slice(5))}</text>
+      <text x="${width - pad.right - 42}" y="${height - 12}" class="local-review-date-label">${esc(rows.at(-1).date.slice(5))}</text>
+      ${hitAreas}
+    </svg>
+  `;
+}
+
+function renderLocalReviewDetail(data, date = "") {
+  const visibleRows = localReviewVisibleRows(data);
+  const row = visibleRows.find((item) => item.date === date) || visibleRows.at(-1) || data.rows.at(-1);
+  if (!row) return `<div class="empty">没有可显示的日期。</div>`;
+  const allIndex = data.rows.indexOf(row);
+  const previous = data.rows[allIndex - 1]?.snapshot;
+  const costBefore = previous?.currentCost ?? row.snapshot.currentCost;
+  const costAfter = row.snapshot.currentCost;
+  const costDiff = costBefore !== null && costAfter !== null ? costAfter - costBefore : null;
+  const tradeList = row.trades.length ? row.trades.map((trade) => `
+    <li class="${trade.side}"><b>${trade.side === "buy" ? "买入" : "卖出"}</b><span>${qty(trade.shares)}股 @${priceText(trade.price)}</span><em>${money(trade.amount || trade.price * trade.shares)}</em></li>
+  `).join("") : `<li>当天没有原始交易。</li>`;
+  const matchList = row.matches.length ? row.matches.map((match) => `
+    <li>
+      <b>${qty(match.shares)}股</b>
+      <span>${esc(match.buyDate)} ${priceText(match.buyPrice)} → ${esc(match.sellDate)} ${priceText(match.sellPrice)}</span>
+      <strong class="${profitClass(match.profit)}">${plainInteger(match.profit)}</strong>
+      <em>费 ${money(match.fee)}</em>
+    </li>
+  `).join("") : `<li>当天没有完成匹配。</li>`;
+  const dayUnmatched = row.snapshot.unmatched.filter((lot) => lot.date === row.date);
+  const unmatchedList = dayUnmatched.length ? dayUnmatched.map((lot) => `
+    <li class="${lot.side}"><b>${lot.side === "buy" ? "未匹配买入" : "未匹配卖出"}</b><span>${priceText(lot.price)}*${lot.side === "sell" ? "-" : ""}${qty(lot.remaining)}</span></li>
+  `).join("") : `<li>当天没有新增未匹配点。</li>`;
+  const eventList = row.events.length ? row.events.map((event) => `<li><b>${esc(event.date)}</b><span>现金 ${priceText(event.cash || 0)}/股 · 每10股送转 ${priceText(event.bonusPer10 || 0)}</span>${event.note ? `<em>${esc(event.note)}</em>` : ""}</li>`).join("") : `<li>当天没有分红送股。</li>`;
+  const matchProfit = row.matches.reduce((sum, match) => sum + match.profit, 0);
+  const matchShares = row.matches.reduce((sum, match) => sum + match.shares, 0);
+  return `
+    <section class="local-review-day-card">
+      <div class="local-review-day-head">
+        <h3>${esc(row.date)}</h3>
+        <span class="${profitClass(matchProfit)}">匹配盈亏 ${plainInteger(matchProfit)}</span>
+      </div>
+      <div class="local-review-day-metrics">
+        <article><span>当天持仓</span><strong>${qty(row.snapshot.shares)} 股</strong></article>
+        <article><span>成本变化</span><strong>${costDiff === null ? "-" : `${signedPriceText(costDiff)}/股`}</strong><em>${costBefore ? priceText(costBefore) : "-"} → ${costAfter ? priceText(costAfter) : "-"}</em></article>
+        <article><span>匹配股数</span><strong>${qty(matchShares)} 股</strong></article>
+        <article><span>成交参考</span><strong>${priceText(row.close)}</strong><em>高 ${priceText(row.high)} / 低 ${priceText(row.low)}</em></article>
+      </div>
+      <div class="local-review-detail-grid">
+        <div><h4>当天交易</h4><ul>${tradeList}</ul></div>
+        <div><h4>匹配盈亏</h4><ul>${matchList}</ul></div>
+        <div><h4>未匹配</h4><ul>${unmatchedList}</ul></div>
+        <div><h4>分红送股</h4><ul>${eventList}</ul></div>
+      </div>
+    </section>
+  `;
+}
+
+function renderLocalReviewModal(data = localReviewData) {
+  if (!data) return;
+  const modal = document.querySelector("#localReviewModal");
+  if (!modal) return;
+  const visibleRows = localReviewVisibleRows(data);
+  const selected = visibleRows.some((row) => row.date === localReviewSelectedDate) ? localReviewSelectedDate : (visibleRows.at(-1)?.date || data.rows.at(-1)?.date || "");
+  localReviewSelectedDate = selected;
+  document.querySelector("#localReviewTitle").textContent = `${data.name || data.symbol} ${data.symbol} 无K线交易复盘`;
+  document.querySelector("#localReviewSubtitle").textContent = `${data.start} 至 ${data.end} · 区间共 ${data.rows.length} 个本地日期`;
+  document.querySelector("#localReviewStatus").textContent = "未加载行情。使用本地交易、匹配、成本和分红送股生成。";
+  document.querySelector("#localReviewStartInput").value = data.start;
+  document.querySelector("#localReviewEndInput").value = data.end;
+  syncLocalReviewAxisControls(data);
+  document.querySelector("#localReviewSummary").innerHTML = renderLocalReviewSummary(data);
+  document.querySelector("#localReviewChart").innerHTML = renderLocalReviewChart(data, selected);
+  document.querySelector("#localReviewDetail").innerHTML = renderLocalReviewDetail(data, selected);
+  modal.hidden = false;
+}
+
+function openLocalReview() {
+  const symbol = normalizeSymbol(els.tFilterSymbol.value);
+  if (!symbol) {
+    window.alert("请先选择一只股票，再打开无K线复盘。");
+    return;
+  }
+  localReviewData = buildLocalReviewData(symbol, "", "");
+  localReviewWindowStart = Math.max(0, localReviewData.rows.length - Math.min(localReviewData.rows.length || 0, 60));
+  localReviewWindowSize = Math.min(localReviewData.rows.length || 0, 60);
+  localReviewSelectedDate = localReviewData.rows.at(-1)?.date || "";
+  renderLocalReviewModal(localReviewData);
+}
 function exportBackup() {
   const name = (els.backupName.value.trim() || "网格交易-备份").includes("网格交易") ? els.backupName.value.trim() || "网格交易-备份" : `网格交易-${els.backupName.value.trim()}`;
   const payload = { ...collectState(), name, type: "grid-trading-backup", exportedAt: new Date().toISOString() };
@@ -2409,6 +2819,34 @@ els.symbolModal.addEventListener("click", (event) => {
   saveState();
 });
 document.addEventListener("click", (event) => {
+  if (event.target.closest("#openLocalReviewButton")) {
+    openLocalReview();
+  }
+  if (event.target.closest("#closeLocalReviewModal") || event.target.matches("[data-close-local-review]")) {
+    const modal = document.querySelector("#localReviewModal");
+    if (modal) modal.hidden = true;
+  }
+  if (event.target.closest("#applyLocalReviewRange")) {
+    const symbol = normalizeSymbol(els.tFilterSymbol.value);
+    localReviewData = buildLocalReviewData(symbol, document.querySelector("#localReviewStartInput")?.value || "", document.querySelector("#localReviewEndInput")?.value || "");
+    localReviewWindowStart = Math.max(0, localReviewData.rows.length - Math.min(localReviewData.rows.length || 0, 60));
+    localReviewWindowSize = Math.min(localReviewData.rows.length || 0, 60);
+    localReviewSelectedDate = localReviewData.rows.at(-1)?.date || "";
+    renderLocalReviewModal(localReviewData);
+  }
+  if (event.target.closest("#resetLocalReviewRange")) {
+    const symbol = normalizeSymbol(els.tFilterSymbol.value);
+    localReviewData = buildLocalReviewData(symbol, "", "");
+    localReviewWindowStart = 0;
+    localReviewWindowSize = localReviewData.rows.length;
+    localReviewSelectedDate = localReviewData.rows.at(-1)?.date || "";
+    renderLocalReviewModal(localReviewData);
+  }
+  const localReviewHit = event.target.closest("[data-local-review-date]");
+  if (localReviewHit && localReviewData) {
+    localReviewSelectedDate = localReviewHit.dataset.localReviewDate || "";
+    renderLocalReviewModal(localReviewData);
+  }
   const viewButton = event.target.closest("#clearedModal [data-action='view-symbol']");
   if (viewButton) {
     els.clearedModal.hidden = true;
@@ -2525,6 +2963,18 @@ els.applyTradeFilter?.addEventListener("click", () => {
   if (!els.allProfitModal?.hidden) renderAllProfitModal();
   saveState();
 });
+document.addEventListener("input", (event) => {
+  if (event.target.matches("#localReviewZoomInput") && localReviewData) {
+    localReviewWindowSize = Math.max(1, Number(event.target.value) || 1);
+    normalizeLocalReviewWindow(localReviewData);
+    renderLocalReviewModal(localReviewData);
+  }
+  if (event.target.matches("#localReviewPanInput") && localReviewData) {
+    localReviewWindowStart = Math.max(0, Number(event.target.value) || 0);
+    normalizeLocalReviewWindow(localReviewData);
+    renderLocalReviewModal(localReviewData);
+  }
+});
 els.clearedSearch?.addEventListener("input", renderClearedModal);
 els.exportBackup.addEventListener("click", exportBackup);
 els.importBackup.addEventListener("click", () => {
@@ -2536,6 +2986,7 @@ els.clearTrades.addEventListener("click", clearTrades);
 async function initializeApp() {
   grids = defaultGrids();
   ensureMatchedDetailModal();
+  ensureLocalReviewModal();
   await loadTrades();
   restoreState();
   await migrateLegacyTradeStorage();
