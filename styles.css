@@ -3219,6 +3219,15 @@ tbody tr:hover {
   stroke-linejoin: round;
 }
 
+.local-review-cost-clamp {
+  fill: #ffd166;
+  font-size: 13px;
+  font-weight: 950;
+  paint-order: stroke;
+  stroke: rgba(3, 7, 18, 0.92);
+  stroke-width: 4px;
+}
+
 .local-review-point {
   font-size: 13px;
   font-weight: 900;

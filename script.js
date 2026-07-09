@@ -2479,15 +2479,18 @@ function renderLocalReviewChart(data, selectedDate = "") {
   const pad = { left: 54, right: 22, top: 24, bottom: 42 };
   const plotW = width - pad.left - pad.right;
   const plotH = height - pad.top - pad.bottom;
-  const prices = rows.flatMap((row) => [row.open, row.high, row.low, row.close, row.snapshot.currentCost]).filter((value) => Number(value) > 0);
+  const prices = rows.flatMap((row) => [row.open, row.high, row.low, row.close]).filter((value) => Number(value) > 0);
+  if (!prices.length) prices.push(...rows.map((row) => row.snapshot.currentCost).filter((value) => Number(value) > 0));
   if (!prices.length) prices.push(1);
   const min = Math.min(...prices);
   const max = Math.max(...prices);
   const span = Math.max(0.01, max - min);
   const yMin = Math.max(0, min - span * 0.12);
   const yMax = max + span * 0.12;
+  const clampYValue = (value) => Math.max(yMin, Math.min(yMax, Number(value || 0)));
+  const isYClamped = (value) => Number(value || 0) < yMin || Number(value || 0) > yMax;
   const xFor = (index) => pad.left + (rows.length <= 1 ? plotW / 2 : (index / (rows.length - 1)) * plotW);
-  const yFor = (value) => pad.top + ((yMax - Number(value || 0)) / (yMax - yMin)) * plotH;
+  const yFor = (value) => pad.top + ((yMax - clampYValue(value)) / (yMax - yMin)) * plotH;
   const maxShares = Math.max(1, ...rows.map((row) => Math.max(0, Number(row.snapshot.shares || 0))));
   const barW = Math.max(5, Math.min(18, plotW / Math.max(1, rows.length) * 0.7));
   const baseY = height - pad.bottom;
@@ -2502,9 +2505,19 @@ function renderLocalReviewChart(data, selectedDate = "") {
     return `<line x1="${pad.left}" y1="${y}" x2="${width - pad.right}" y2="${y}" /><text x="8" y="${y + 4}">${priceText(price)}</text>`;
   }).join("");
   const closeLine = rows.map((row, index) => `${xFor(index)},${yFor(row.close)}`).join(" ");
-  const costLine = rows.filter((row) => Number(row.snapshot.currentCost) > 0).map((row) => `${xFor(rows.indexOf(row))},${yFor(row.snapshot.currentCost)}`).join(" ");
   const tooltipText = (lines) => esc(lines.filter(Boolean).join("\n"));
   const tooltipAttr = (lines) => `data-local-review-tooltip="${tooltipText(lines)}"`;
+  const costRows = rows.filter((row) => Number(row.snapshot.currentCost) > 0);
+  const costLine = costRows.map((row) => `${xFor(rows.indexOf(row))},${yFor(row.snapshot.currentCost)}`).join(" ");
+  const costClampMarks = costRows
+    .filter((row) => isYClamped(row.snapshot.currentCost))
+    .map((row) => {
+      const index = rows.indexOf(row);
+      const high = Number(row.snapshot.currentCost || 0) > yMax;
+      const y = yFor(row.snapshot.currentCost);
+      const label = high ? "\u6210\u672c\u2191" : "\u6210\u672c\u2193";
+      return `<text class="local-review-cost-clamp" ${tooltipAttr([row.date, `\u6210\u672c\u771f\u5b9e\u503c ${priceText(row.snapshot.currentCost)}`, "\u5df2\u622a\u65ad\u663e\u793a\uff0c\u907f\u514d\u538b\u7f29\u6210\u4ea4\u4ef7\u683c\u6ce2\u52a8"])} x="${xFor(index) - 16}" y="${high ? y + 15 : y - 7}">${label}</text>`;
+    }).join("");
   const dayTooltip = (row) => tooltipAttr([
     row.date,
     `\u6536\u76d8 ${priceText(row.close)} \u00b7 \u6210\u672c ${row.snapshot.currentCost ? priceText(row.snapshot.currentCost) : "-"}`,
@@ -2558,6 +2571,7 @@ function renderLocalReviewChart(data, selectedDate = "") {
       ${bars}
       <polyline class="local-review-price-line" points="${closeLine}" />
       ${costLine ? `<polyline class="local-review-cost-line" points="${costLine}" />` : ""}
+      ${costClampMarks}
       ${hitAreas}
       ${rows.map((row, index) => point(row, index, "buy")).join("")}
       ${rows.map((row, index) => point(row, index, "sell")).join("")}
@@ -3085,12 +3099,13 @@ document.addEventListener("pointerdown", (event) => {
     event.preventDefault();
     chart.setPointerCapture?.(event.pointerId);
     updateLocalReviewFromPointer(event);
-  }
-}, { passive: false });
-document.addEventListener("pointerout", (event) => {
-  if (event.target.closest?.("#localReviewChart") && !event.relatedTarget?.closest?.("#localReviewChart")) {
+  } else if (!event.target.closest?.("#localReviewModal")) {
     hideLocalReviewTooltip();
   }
+}, { passive: false });
+document.addEventListener("pointerup", (event) => {
+  const chart = event.target.closest?.("#localReviewChart");
+  if (chart) chart.releasePointerCapture?.(event.pointerId);
 });
 els.exportBackup.addEventListener("click", exportBackup);
 els.importBackup.addEventListener("click", () => {
